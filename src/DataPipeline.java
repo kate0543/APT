@@ -178,4 +178,26 @@ public class DataPipeline {
         }
         return null; // Return null if no student with the given ID is found
     }
+    /**
+     * Cleans a list of strings by removing all double quotes and trimming whitespace from each string.
+     * Returns a new list containing the cleaned strings. The original list remains unchanged.
+     *
+     * @param lines The list of strings to clean.
+     * @return A new list with cleaned strings, or an empty list if the input is null or empty.
+     */
+    public static List<String> cleanLines(List<String> lines) {
+        List<String> cleanedList = new ArrayList<>();
+        if (lines == null) {
+            return cleanedList; // Return an empty list for null input
+        }
+        for (String line : lines) {
+            if (line != null) {
+                String cleanedLine = line.replace("\"", "").trim();
+                cleanedList.add(cleanedLine);
+            } else {
+                cleanedList.add(null); // Preserve null entries if necessary, or skip/add empty string
+            }
+        }
+        return cleanedList;
+    }
 }
