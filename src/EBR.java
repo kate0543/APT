@@ -7,6 +7,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * The {@code EBR} class is responsible for processing data from Exam Board Reporter (EBR) files.
+ * It locates and reads EBR Module Report and Programme Report CSV files based on programme codes.
+ * The class extracts module component details (marks, weights) from Module Reports and module-level
+ * records from Programme Reports, associating this information with the corresponding {@link Student}
+ * and {@link Module} objects. It complements data initially fetched from Qlikview sources.
+ *
+ * Key functionalities include:
+ * - Locating relevant EBR CSV files within a specified directory structure.
+ * - Parsing Module Reports to extract component details (title, code, mark, weight) for each student and module.
+ * - Parsing Programme Reports to extract overall module records for each student.
+ * - Merging the extracted EBR data with existing student records.
+ * - Handling potential errors during file processing and data parsing.
+ */
 public class EBR {
 
     private static String Term = "";
@@ -148,139 +162,139 @@ public class EBR {
         });
 
         return matchingFiles;
-    } 
-private static List<Student> processProgrammeReport(List<File> files, List<Student> students) {
-    for (File file : files) {
-        try {
-            System.out.println("Processing Programme Report file: " + file.getName());
-            List<String> lines = Files.readAllLines(file.toPath());
-            if (lines.size() < 15) {
-                System.out.println("Skipping file - insufficient lines: " + file.getName());
-                continue;
-            }
-
-            // Extract programme information using extractValue helper
-            String programmeTitle = extractValue(lines, "Programme title");
-            if (programmeTitle.isEmpty()) {
-                System.out.println("Programme title is empty in file: " + file.getName());
-                continue;
-            }
-            String programmeCode = extractValue(lines, "Programme code");
-            String programmeLevel = extractValue(lines, "Programme level");
-            System.out.println("Programme: " + programmeTitle +
-                               " (" + programmeCode + ") Level: " + programmeLevel);
-
-            // Locate the "Module code" line
-            int moduleCRNLine = -1;
-            for (int i = 0; i < lines.size(); i++) {
-                if (lines.get(i).toLowerCase().contains("module code")) {
-                    moduleCRNLine = i;
-                    break;
-                }
-            }
-            if (moduleCRNLine == -1) {
-                System.out.println("Could not find Module code line in file: " + file.getName());
-                continue;
-            }
-
-            // Extract the CRNs and their positions
-            String[] crnFields = lines.get(moduleCRNLine).split(",");
-            List<String> validModuleCRNs = new ArrayList<>();
-            List<Integer> moduleCRNPositions = new ArrayList<>();
-            for (int i = 4; i < crnFields.length; i++) {
-                String crn = crnFields[i].trim();
-                if (crn.matches("\\d+")) {
-                    validModuleCRNs.add(crn);
-                    moduleCRNPositions.add(i);
-                }
-            }
-            System.out.println("Found " + validModuleCRNs.size() +
-                               " module CRNs: " + String.join(", ", validModuleCRNs));
-
-            // Find where student data begins (lines that start with "@")
-            int studentDataStart = -1;
-            for (int i = moduleCRNLine + 2; i < lines.size(); i++) {
-                if (lines.get(i).startsWith("@")) {
-                    studentDataStart = i;
-                    break;
-                }
-            }
-            if (studentDataStart == -1) {
-                System.out.println("Could not find student data in file: " + file.getName());
-                continue;
-            }
-
-            // Process each student record
-            for (int i = studentDataStart; i < lines.size(); i++) {
-                String line = lines.get(i);
-                if (!line.startsWith("@")) continue;
-                String[] fields = line.split(",");
-                if (fields.length < 5) continue;
-
-                // Parse Banner ID
-                String rawId = fields[0].replace("@", "").replaceFirst("^0+(?!$)", "");
-                int bannerId;
-                try {
-                    bannerId = Integer.parseInt(rawId);
-                } catch (NumberFormatException e) {
-                    System.out.println("Invalid Banner ID: " + fields[0]);
+    }
+    private static List<Student> processProgrammeReport(List<File> files, List<Student> students) {
+        for (File file : files) {
+            try {
+                System.out.println("Processing Programme Report file: " + file.getName());
+                List<String> lines = Files.readAllLines(file.toPath());
+                if (lines.size() < 15) {
+                    System.out.println("Skipping file - insufficient lines: " + file.getName());
                     continue;
                 }
 
-                Student student = DataPipeline.findStudentById(students, bannerId);
-                if (student == null) {
-                    System.out.println("Student not found: " + bannerId);
+                // Extract programme information using extractValue helper
+                String programmeTitle = extractValue(lines, "Programme title");
+                if (programmeTitle.isEmpty()) {
+                    System.out.println("Programme title is empty in file: " + file.getName());
                     continue;
                 }
+                String programmeCode = extractValue(lines, "Programme code");
+                String programmeLevel = extractValue(lines, "Programme level");
+                System.out.println("Programme: " + programmeTitle +
+                                   " (" + programmeCode + ") Level: " + programmeLevel);
 
-                // Update each module record for this student
-                for (int j = 0; j < validModuleCRNs.size(); j++) {
-                    String moduleCRN = validModuleCRNs.get(j);
-                    int pos = moduleCRNPositions.get(j);
-                    if (pos >= fields.length) continue;
-                    String record = fields[pos].trim();
-                    if (record.isEmpty()) continue;
-
-                    // Clean up format
-                    record = record.replace("*", "").replace("R", "").trim();
-
-                    // Locate the Module object and update if not yet updated
-                    Module module = findModuleByModuleCRN(student, moduleCRN);
-                    if (module != null && !module.getModuleInfoUpdated()) {
-                        module.setModuleRecord(record);
-                        module.updateModuleInfo();
-                        System.out.println("Updated module " + moduleCRN +
-                                           " for student " + bannerId +
-                                           " with record: " + record);
+                // Locate the "Module code" line
+                int moduleCRNLine = -1;
+                for (int i = 0; i < lines.size(); i++) {
+                    if (lines.get(i).toLowerCase().contains("module code")) {
+                        moduleCRNLine = i;
+                        break;
                     }
                 }
-            }
-        } catch (IOException e) {
-            System.err.println("Error processing Programme Report file " +
-                                file.getName() + ": " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-    return students;
-}
-private static String extractValue(List<String> lines, String key) {
-    for (String line : lines) {
-        String[] parts = line.split(",");
-        if (parts.length > 1 && parts[0].trim().equals(key)) {
-            return parts[1].trim();
-        }
-    }
-    return "";
-}
+                if (moduleCRNLine == -1) {
+                    System.out.println("Could not find Module code line in file: " + file.getName());
+                    continue;
+                }
 
-private static Module findModuleByModuleCRN(Student student, String moduleCRN) {
-    for (Module module : student.getModules()) {
-        if (module.getModuleCRN() != null && module.getModuleCRN().equals(moduleCRN)) {
-            return module;
+                // Extract the CRNs and their positions
+                String[] crnFields = lines.get(moduleCRNLine).split(",");
+                List<String> validModuleCRNs = new ArrayList<>();
+                List<Integer> moduleCRNPositions = new ArrayList<>();
+                for (int i = 4; i < crnFields.length; i++) {
+                    String crn = crnFields[i].trim();
+                    if (crn.matches("\\d+")) {
+                        validModuleCRNs.add(crn);
+                        moduleCRNPositions.add(i);
+                    }
+                }
+                System.out.println("Found " + validModuleCRNs.size() +
+                                   " module CRNs: " + String.join(", ", validModuleCRNs));
+
+                // Find where student data begins (lines that start with "@")
+                int studentDataStart = -1;
+                for (int i = moduleCRNLine + 2; i < lines.size(); i++) {
+                    if (lines.get(i).startsWith("@")) {
+                        studentDataStart = i;
+                        break;
+                    }
+                }
+                if (studentDataStart == -1) {
+                    System.out.println("Could not find student data in file: " + file.getName());
+                    continue;
+                }
+
+                // Process each student record
+                for (int i = studentDataStart; i < lines.size(); i++) {
+                    String line = lines.get(i);
+                    if (!line.startsWith("@")) continue;
+                    String[] fields = line.split(",");
+                    if (fields.length < 5) continue;
+
+                    // Parse Banner ID
+                    String rawId = fields[0].replace("@", "").replaceFirst("^0+(?!$)", "");
+                    int bannerId;
+                    try {
+                        bannerId = Integer.parseInt(rawId);
+                    } catch (NumberFormatException e) {
+                        System.out.println("Invalid Banner ID: " + fields[0]);
+                        continue;
+                    }
+
+                    Student student = DataPipeline.findStudentById(students, bannerId);
+                    if (student == null) {
+                        System.out.println("Student not found: " + bannerId);
+                        continue;
+                    }
+
+                    // Update each module record for this student
+                    for (int j = 0; j < validModuleCRNs.size(); j++) {
+                        String moduleCRN = validModuleCRNs.get(j);
+                        int pos = moduleCRNPositions.get(j);
+                        if (pos >= fields.length) continue;
+                        String record = fields[pos].trim();
+                        if (record.isEmpty()) continue;
+
+                        // Clean up format
+                        record = record.replace("*", "").replace("R", "").trim();
+
+                        // Locate the Module object and update if not yet updated
+                        Module module = findModuleByModuleCRN(student, moduleCRN);
+                        if (module != null && !module.getModuleInfoUpdated()) {
+                            module.setModuleRecord(record);
+                            module.updateModuleInfo();
+                            System.out.println("Updated module " + moduleCRN +
+                                               " for student " + bannerId +
+                                               " with record: " + record);
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                System.err.println("Error processing Programme Report file " +
+                                    file.getName() + ": " + e.getMessage());
+                e.printStackTrace();
+            }
         }
+        return students;
     }
-    return null;
-}
+    private static String extractValue(List<String> lines, String key) {
+        for (String line : lines) {
+            String[] parts = line.split(",");
+            if (parts.length > 1 && parts[0].trim().equals(key)) {
+                return parts[1].trim();
+            }
+        }
+        return "";
+    }
+
+    private static Module findModuleByModuleCRN(Student student, String moduleCRN) {
+        for (Module module : student.getModules()) {
+            if (module.getModuleCRN() != null && module.getModuleCRN().equals(moduleCRN)) {
+                return module;
+            }
+        }
+        return null;
+    }
     /**
      * Adds component information from CSV files to students.
      */
