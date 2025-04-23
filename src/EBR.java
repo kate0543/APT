@@ -7,20 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * The {@code EBR} class is responsible for processing data from Exam Board Reporter (EBR) files.
- * It locates and reads EBR Module Report and Programme Report CSV files based on programme codes.
- * The class extracts module component details (marks, weights) from Module Reports and module-level
- * records from Programme Reports, associating this information with the corresponding {@link Student}
- * and {@link Module} objects. It complements data initially fetched from Qlikview sources.
- *
- * Key functionalities include:
- * - Locating relevant EBR CSV files within a specified directory structure.
- * - Parsing Module Reports to extract component details (title, code, mark, weight) for each student and module.
- * - Parsing Programme Reports to extract overall module records for each student.
- * - Merging the extracted EBR data with existing student records.
- * - Handling potential errors during file processing and data parsing.
- */
+ 
 public class EBR {
 
     private static String Term = "";
@@ -36,6 +23,37 @@ public class EBR {
         List<String> targetProgrammeCodesList = List.of("BMT.S", "BMT.F"); // Target programme codes
         List<Student> students = new ArrayList<>(); // List to store all students
 
+        List<File> ModuleReports =locateEBRFiles(baseFolderPath+"EBR/", "ModuleReport",targetProgrammeCodesList.get(1));
+        // students = Qlikview.fetchStudents(baseFolderPath, targetProgrammeCodesList);
+        // students = updateStudentsList(students, addComponentsToStudents(ModuleReports, students));
+        students = fetchStudentsMR(students, baseFolderPath, targetProgrammeCodesList);
+
+        for (Student student : students) {
+            for(Module module: student.getModules()){
+                        // System.out.println();
+                        // System.out.println("update matchingStudent "+student.getBannerID()+" "+student.getName());
+                        // System.out.println("Module CRN: " + module.getModuleCRN() +" Module ID: " + module.getModuleTitle());
+                       for(Component component: module.getComponents()){
+                           if(component.getComponentTitle() != null && !component.getComponentTitle().isEmpty()){
+                            if(component.getComponentTitle().contains("\"")) {
+                               System.out.println(component.getComponentTitle());
+                            }
+                           }
+                           
+                       }
+                       if(module.getComponents().isEmpty()){ 
+                        
+                            System.out.println("Student "+student.getBannerID()+" "+student.getName()+" has no components for module "+module.getModuleCRN());
+                    
+                       }
+            }
+    
+        }
+    
+}
+    public static List<Student> fetchStudentsMR(List<Student> students, String baseFolderPath, List<String> targetProgrammeCodesList) throws IOException {
+        
+        
         for (String targetProgrammeCode : targetProgrammeCodesList) {
             try {
                 students.addAll(Qlikview.fetchStudents(baseFolderPath, List.of(targetProgrammeCode)));
@@ -45,27 +63,11 @@ public class EBR {
                 e.printStackTrace();
             }
         }
-
-        students = fetchStudents(students, baseFolderPath, targetProgrammeCodesList);
-
-        for (Student student : students) {
-            for (Module module : student.getModules()) {
-                System.out.println("Module: " + module.toString());
-                // for (Component component : module.getComponents()) {
-                //     System.out.println("Component: " + component.toString());
-                // }
-            }
-        }
-    }
-
-    /**
-     * Fetches students and adds component information from EBR files.
-     */
-    public static List<Student> fetchStudents(List<Student> students, String baseFolderPath, List<String> targetProgrammeCodesList) throws IOException {
+        
         for (String targetProgrammeCode : targetProgrammeCodesList) {
             try {
                 List<File> files = locateEBRFiles(baseFolderPath + "/EBR", "ModuleReport",targetProgrammeCode);
-                students = addComponentsToStudents(files, students);
+                 students = updateStudentsList(students, addComponentsToStudents(files, students));
             } catch (IOException e) {
                 System.err.println("An error occurred while processing EBR Module Report files: " + e.getMessage());
                 e.printStackTrace();
@@ -79,25 +81,29 @@ public class EBR {
         System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("                                EBR Module Reports Data processing completed.");
         System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+    
+        return students;
+    }   
+        public static List<Student> fetchStudentsPR(List<Student> students, String baseFolderPath, List<String> targetProgrammeCodesList) throws IOException {
 
 
-        for (String targetProgrammeCode : targetProgrammeCodesList) {
-            try {
-                List<File> files = locateEBRFiles(baseFolderPath + "/EBR", "ProgrammeReport",targetProgrammeCode);
-                students = processProgrammeReport(files, students);
-            } catch (IOException e) {
-                System.err.println("An error occurred while processing EBR Porgramme files: " + e.getMessage());
-                e.printStackTrace();
-            }
-        }
-        if (!students.isEmpty()) {
-            for (Student student : students) {
-                student.checkFailedComponents(); // Check for failed modules
-            }
-        }
-        System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
-        System.out.println("                                EBR Module Reports Data processing completed.");
-        System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+        // for (String targetProgrammeCode : targetProgrammeCodesList) {
+        //     try {
+        //         List<File> files = locateEBRFiles(baseFolderPath + "/EBR", "ProgrammeReport",targetProgrammeCode);
+        //         students = processProgrammeReport(files, students);
+        //     } catch (IOException e) {
+        //         System.err.println("An error occurred while processing EBR Porgramme files: " + e.getMessage());
+        //         e.printStackTrace();
+        //     }
+        // }
+        // if (!students.isEmpty()) {
+        //     for (Student student : students) {
+        //         student.checkFailedComponents(); // Check for failed modules
+        //     }
+        // }
+        // System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+        // System.out.println("                                EBR Programme Reports Data processing completed.");
+        // System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
 
         return students;
     }
@@ -112,54 +118,26 @@ public class EBR {
     public static List<File> locateEBRFiles(String folderPath, String reportType, String targetProgrammeCode) throws IOException {
         List<File> matchingFiles = new ArrayList<>();
         File folder = new File(folderPath);
-
-        if (!folder.exists() || !folder.isDirectory()) {
-            throw new IOException("Directory not found: " + folderPath);
-        }
-
-        File[] files = folder.listFiles();
-        if (files == null || files.length == 0) {
-            throw new IOException("No files found in directory: " + folderPath);
-        }
-
-        // Filter files containing the target programme code and ending with .csv
-        for (File file : files) {
-            if (file.isFile()) {
-                if (file.getName().contains(reportType)) {
-                    String fileName = file.getName();
-                    if (!(fileName.contains(targetProgrammeCode) && fileName.endsWith(".csv"))) {
-                        continue; // Skip files that do not match the criteria
-                    }
-                } else {
-                    continue; // Skip non-file entries
+        if (folder.exists() && folder.isDirectory()) {
+            File[] files = folder.listFiles((dir, name) ->
+                name.endsWith(".csv") &&
+                name.contains(reportType) &&
+                name.contains(targetProgrammeCode)
+            );
+            if (files != null) {
+                for (File file : files) {
+                    matchingFiles.add(file);
                 }
-                matchingFiles.add(file);
             }
         }
 
-        // Sort files by year (descending) extracted from filename like ModuleReport-BMT.F-YY-YY-...
-        matchingFiles.sort((f1, f2) -> {
-            int year1 = -1;
-            int year2 = -1;
-            try {
-                String[] parts1 = f1.getName().split("-");
-                if (parts1.length >= 3) {
-                    year1 = Integer.parseInt(parts1[2]);
-                }
-            } catch (NumberFormatException e) {
-                System.err.println("Could not parse year from filename: " + f1.getName() + " - " + e.getMessage());
-            }
-            try {
-                String[] parts2 = f2.getName().split("-");
-                if (parts2.length >= 3) {
-                    year2 = Integer.parseInt(parts2[2]);
-                }
-            } catch (NumberFormatException e) {
-                System.err.println("Could not parse year from filename: " + f2.getName() + " - " + e.getMessage());
-            }
-            // Sort descending: latest year first. Files with unparseable years go last.
-            return Integer.compare(year2, year1);
-        });
+        System.out.println("Found " + matchingFiles.size() + " matching files for report type: " + reportType + " and programme code: " + targetProgrammeCode);
+  
+
+        matchingFiles.sort((f1, f2) -> f2.getName().compareTo(f1.getName()));
+        // for (File file : matchingFiles) {
+        //     System.out.println("Matching file: " + file.getName());
+        // }
 
         return matchingFiles;
     }
@@ -295,158 +273,7 @@ public class EBR {
         }
         return null;
     }
-    /**
-     * Adds component information from CSV files to students.
-     */
-    public static List<Student> addComponentsToStudents(List<File> csvFiles, List<Student> students) {
-        for (File file : csvFiles) {
-            try {
-                List<String> lines = Files.readAllLines(file.toPath());
-                if (lines.size() < 6) continue;
-
-                // Debug the content to understand the format
-                System.out.println("First line content: " + lines.get(0));
-
-                // Try to detect the delimiter (tab or comma)
-                String firstLine = lines.get(0);
-                String delimiter = firstLine.contains("\t") ? "\t" : ",";
-
-                // Parse module information
-                String[] moduleLine = firstLine.split(delimiter);
-                if (moduleLine.length < 2) {
-                    System.err.println("Cannot parse module line, unexpected format: " + firstLine);
-                    continue;
-                }
-
-                String moduleCRN = moduleLine[1].trim(); // Module CRN used as moduleID
-                String moduleTitle = moduleLine.length > 3 ? moduleLine[3].trim() : "Unknown Module";
-
-                System.out.println("Processing file for module: " + moduleCRN + " - " + moduleTitle);
-
-                // Identify component columns and create base components
-                int componentStartIndex = 5;
-                List<Integer> componentIndices = new ArrayList<>();
-                List<Component> baseComponents = new ArrayList<>();
-
-                String[] compTitleLine = lines.get(2).split(delimiter);
-                String[] weightLine = lines.get(3).split(delimiter);
-
-                for (int i = componentStartIndex; i < compTitleLine.length; i++) {
-                    String title = compTitleLine[i].trim();
-                    if (!title.isEmpty()) {
-                        componentIndices.add(i);
-                        Component comp = new Component();
-                        comp.setModuleCRN(moduleCRN);
-                        comp.setComponentTitle(title);
-                        comp.setComponentCode("C" + (i - componentStartIndex + 1));
-                        comp.setComponentType("Assessment");
-                        if (i < weightLine.length && !weightLine[i].isEmpty()) {
-                            try {
-                                String rawWeight = weightLine[i].replace("#", "").trim();
-                                comp.setComponentScore(Integer.parseInt(rawWeight));
-                            } catch (NumberFormatException e) {
-                                comp.setComponentScore(0);
-                            }
-                        }
-                        baseComponents.add(comp);
-                    }
-                }
-
-                // Process each student line
-                for (int i = 5; i < lines.size(); i++) {
-                    String line = lines.get(i);
-                    if (!line.startsWith("@")) continue;
-
-                    String[] tokens = line.split(delimiter);
-                    if (tokens.length < 9) {
-                        System.out.println("Skipping line with insufficient data: " + line);
-                        continue;
-                    }
-
-                    String bannerIdStr = tokens[0].trim().substring(1).replaceFirst("^0+(?!$)", "");
-                    int bannerId;
-                    try {
-                        bannerId = Integer.parseInt(bannerIdStr);
-                    } catch (NumberFormatException e) {
-                        System.err.println("Failed to parse Banner ID: " + tokens[0]);
-                        continue;
-                    }
-
-                    Student student = DataPipeline.findStudentById(students, bannerId);
-                    if (student == null) {
-                        System.out.println("Student not found with ID: " + bannerId);
-                        continue;
-                    }
-
-                    // Find the relevant module in the student's module list
-                    Module module = null;
-                    for (Module m : student.getModules()) {
-                        if (m.getModuleCRN() != null && m.getModuleCRN().equals(moduleCRN)) {
-                            module = m;
-                            break;
-                        }
-                    }
-
-                    if (module == null) {
-                        System.out.println("Module " + moduleCRN + " not found for student " + bannerId);
-                        continue;
-                    }
-
-                    if (module.getComponentDetailsLoaded()) {
-                        System.out.println("Components already loaded for student " + bannerId + ", module " + moduleCRN);
-                        continue;
-                    }
-
-                    List<Component> studentComponents = new ArrayList<>();
-                    for (int j = 0; j < componentIndices.size() && j < baseComponents.size(); j++) {
-                        int colIndex = componentIndices.get(j);
-                        if (colIndex >= tokens.length) continue;
-
-                        String raw = tokens[colIndex].trim();
-                        raw = raw.replace("*", ""); // Remove asterisks if present
-
-                        if (raw.equalsIgnoreCase("NS") || raw.isEmpty()) continue;
-
-                        // Create a new component and copy properties
-                        Component comp = new Component();
-                        Component baseComp = baseComponents.get(j);
-
-                        // Copy properties from base component
-                        comp.setModuleCRN(baseComp.getModuleCRN());
-                        comp.setComponentTitle(baseComp.getComponentTitle());
-                        comp.setComponentCode(baseComp.getComponentCode());
-                        comp.setComponentType(baseComp.getComponentType());
-
-                        // Set student-specific data
-                        comp.setComponentRecord(raw);
-                        comp.updateComponentInfo();
-
-                        studentComponents.add(comp);
-
-                        System.out.println("Added component '" + comp.getComponentTitle() +
-                                "' with mark '" + raw + "' for student " + bannerId);
-                    }
-
-                    module.setComponents(studentComponents);
-                    module.setComponentDetailsLoaded(true);
-
-                    System.out.println("Set " + studentComponents.size() + " components for student " +
-                            bannerId + ", module " + moduleCRN);
-                }
-
-            } catch (IOException e) {
-                System.err.println("Error processing file " + file.getName() + ": " + e.getMessage());
-                e.printStackTrace();
-            }
-        }
-
-        return students;
-    }
-
-
-    /**
-     * Parses a Banner ID from a raw string.
-     */
+ 
     public static Integer parseBannerID(String raw) {
         try {
             String cleaned = raw.replace("@", "").trim().split(",")[0].replaceFirst("^0+(?!$)", "");
@@ -456,4 +283,200 @@ public class EBR {
             return null;
         }
     }
+ 
+
+    public static List<Student> addComponentsToStudents(List<File> csvFiles, List<Student> students) {
+        List<Student> updatedStudents = students; // List to store updated students
+        for (File csvFile : csvFiles) {
+            try {
+                List<String> lines = Files.readAllLines(csvFile.toPath());
+                // It's generally better to parse CSV correctly rather than just removing quotes,
+                // as quotes are often used to enclose fields containing commas.
+                // lines = DataPipeline.cleanLines(lines); // Consider revising or removing this if it causes issues.
+
+                // Extract module CRN and title using a safer method if possible
+                String moduleCRN = "";
+                String moduleTitle = "";
+                String moduleID = "";
+
+                if (lines.size() > 0) {
+                    // Simple split might fail if fields contain commas. Consider a CSV parser library.
+                    String[] moduleHeaderParts = lines.get(0).split(",");
+                    if (moduleHeaderParts.length > 1) moduleCRN = moduleHeaderParts[1].trim();
+                    if (moduleHeaderParts.length > 3) moduleTitle = moduleHeaderParts[3].trim(); // e.g., "Legal Aspects of Business"
+                }
+                if (lines.size() > 1) {
+                    String[] subjectCourseParts = lines.get(1).split(",");
+                    if (subjectCourseParts.length > 1) moduleID = subjectCourseParts[1].trim(); // e.g., "M221/20006"
+                }
+
+
+                // Extract component titles and their corresponding column indices
+                Map<Integer, String> componentTitleMap = new HashMap<>(); // Map column index to title
+                int componentTitleLineIndex = -1;
+                int studentHeaderLineIndex = -1; // Find this early too
+
+                for (int i = 0; i < lines.size(); i++) {
+                    String line = lines.get(i);
+                     // Use contains for flexibility, trim and lowerCase for robustness
+                    if (line.trim().toLowerCase().startsWith("component title")) {
+                        componentTitleLineIndex = i;
+                    }
+                    if (line.trim().toLowerCase().startsWith("student id")) {
+                        studentHeaderLineIndex = i;
+                    }
+                    if(componentTitleLineIndex != -1 && studentHeaderLineIndex != -1) break; // Found both headers
+                }
+
+                System.out.println();
+                System.out.println("Processing file: " + csvFile.getName());
+                System.out.println(moduleCRN + " " + moduleTitle + " " + moduleID);
+
+                if (componentTitleLineIndex != -1) {
+                    // *** Robust CSV Parsing Needed Here ***
+                    // The simple split(",") is the likely cause of the problem.
+                    // If a title like "Report - 1,500 words" exists, split(",") will break it.
+                    // A proper CSV parser would handle quoted commas correctly.
+                    // For now, we demonstrate the issue with the simple split:
+                    String[] titleParts =lines.get(componentTitleLineIndex).split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1);
+                    // Component data usually starts after metadata columns (e.g., Student ID, Name, etc.)
+                    // Let's assume the first component data is in column index 5 based on the original code.
+                    int componentStartColumn = 5;
+                    for (int i = componentStartColumn; i < titleParts.length; i++) {
+                        // Trim and remove quotes from the component title
+                        String componentTitle = titleParts[i].trim().replace("\"", "");
+                         // Skip empty headers that might result from trailing commas or just quotes
+                        if (!componentTitle.isEmpty()) {
+                             // Store the column index and the cleaned title
+                            componentTitleMap.put(i, componentTitle);
+                            System.out.println("Found Component title: '" + componentTitle + "' at column index " + i);
+                        }
+                    }
+                     if (componentTitleMap.isEmpty()) {
+                         System.out.println("Warning: No component titles found or parsed correctly in " + csvFile.getName());
+                     }
+                } else {
+                     System.out.println("Warning: 'Component title' line not found in " + csvFile.getName());
+                }
+
+
+                if (studentHeaderLineIndex != -1 && !componentTitleMap.isEmpty()) {
+                    // Process student data
+                    for (int i = studentHeaderLineIndex + 1; i < lines.size(); i++) {
+                        String line = lines.get(i);
+                        if (line.trim().isEmpty() || !line.trim().startsWith("@")) {
+                            // Stop if line is empty or doesn't seem to be a student record
+                            // Consider adding more robust checks for end-of-data
+                             System.out.println("Reached end of student data or encountered non-student line at line " + (i + 1));
+                            break;
+                        }
+
+                        // *** Robust CSV Parsing Needed Here Too ***
+                        // Splitting student data the same way is problematic.
+                        String[] studentParts = line.split(",");
+
+                        Integer bannerId = parseBannerID(studentParts[0]); // Use the existing helper
+                        if (bannerId == null) {
+                             System.out.println("Skipping line due to invalid Banner ID: " + studentParts[0]);
+                            continue; // Skip if banner ID is invalid
+                        }
+
+
+                        // Find the matching student
+                        Student matchingStudent = DataPipeline.findStudentById(updatedStudents, bannerId);
+                        if (matchingStudent == null) {
+                            // System.out.println("Student not found: " + bannerId);
+                            continue; // Skip if student not found
+                        }
+
+                        // Find the specific module for this student
+                        Module studentModule = findModuleByModuleCRN(matchingStudent, moduleCRN);
+                        if (studentModule == null) {
+                            //  System.out.println("Module " + moduleCRN + " not found for student " + bannerId);
+                            continue; // Skip if student doesn't have this module
+                        }
+
+                        // Check if components for this module seem loaded (basic check)
+                        // A more robust check might compare against componentTitleMap size/keys
+                        if (studentModule.getComponentDetailsLoaded()) {
+                             System.out.println("Components already seem loaded for module " + moduleCRN + " student " + bannerId + ". Skipping.");
+                            continue; // Skip if already processed
+                        }
+
+                        List<Component> components = new ArrayList<>();
+                        // Iterate through the identified component columns
+                        for (Map.Entry<Integer, String> entry : componentTitleMap.entrySet()) {
+                            int columnIndex = entry.getKey();
+                            String componentTitle = entry.getValue(); // Title is already cleaned
+
+                            if (columnIndex < studentParts.length) {
+                                String rawRecord = studentParts[columnIndex].trim();
+
+                                // Create a new component
+                                Component component = new Component(
+                                    moduleCRN,     // moduleCRN
+                                    moduleID,      // moduleID
+                                    componentTitle, // componentTitle (cleaned)
+                                    rawRecord      // rawRecord (potentially misaligned)
+                                );
+                                components.add(component);
+                                 // System.out.println("  Added component: " + componentTitle + " with record: " + rawRecord);
+                            } else {
+                                // Handle cases where student line doesn't have enough columns
+                                System.out.println("Warning: Missing data for component '" + componentTitle + "' (column " + columnIndex + ") for student " + bannerId);
+                                // Optionally create a component with null/empty record or skip
+                                Component component = new Component(moduleCRN, moduleID, componentTitle, ""); // Example: add with empty record
+                                components.add(component);
+                            }
+                        }
+
+                        // Add components to the student's module
+                        if (!components.isEmpty()) {
+                            studentModule.setComponents(components);
+                            studentModule.setComponentDetailsLoaded(true); // Mark as processed
+                            System.out.println("Successfully added " + components.size() + " components for module " + moduleCRN + " student " + bannerId);
+                        } else {
+                             System.out.println("No components were added for module " + moduleCRN + " student " + bannerId);
+                        }
+                    }
+                } else {
+                     if(studentHeaderLineIndex == -1) System.out.println("Warning: 'Student ID' line not found in " + csvFile.getName());
+                     if(componentTitleMap.isEmpty() && componentTitleLineIndex != -1) System.out.println("Warning: Component titles found but map is empty - check parsing logic.");
+                     System.out.println("Skipping student data processing for " + csvFile.getName() + " due to missing headers or titles.");
+                }
+
+            } catch (IOException e) {
+                 System.err.println("Error processing file " + csvFile.getName() + ": " + e.getMessage());
+                e.printStackTrace();
+            } catch (NumberFormatException e) {
+                 System.err.println("Error parsing number in file " + csvFile.getName() + ": " + e.getMessage());
+                 // Log the line number if possible, or context
+            } catch (ArrayIndexOutOfBoundsException e) {
+                 System.err.println("Error accessing array index (likely due to unexpected CSV format) in file " + csvFile.getName() + ": " + e.getMessage());
+                 // Log the line number or context
+            } catch (Exception e) { // Catch broader exceptions
+                 System.err.println("An unexpected error occurred processing file " + csvFile.getName() + ": " + e.getMessage());
+                 e.printStackTrace();
+            }
+        }
+
+        return updatedStudents;
+    }
+
+    /**
+     * Updates the given list of students with new or modified student records.
+     * If a student with the same BannerID exists, it is replaced; otherwise, the new student is added.
+     */
+    public static List<Student> updateStudentsList(List<Student> students, List<Student> updateStudents) {
+        Map<Integer, Student> studentMap = new HashMap<>();
+        for (Student student : students) {
+            studentMap.put(student.getBannerID(), student);
+        }
+        for (Student updated : updateStudents) {
+            studentMap.put(updated.getBannerID(), updated);
+        }
+        return new ArrayList<>(studentMap.values());
+    }
+
+
 }
