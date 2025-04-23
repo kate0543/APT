@@ -211,7 +211,7 @@ public class Module {
     public void setComponents(List<Component> components) {
         this.components = (components != null) ? new ArrayList<>(components) : new ArrayList<>();
         // Optionally update numOfComponents here
-        // this.numOfComponents = this.components.size();
+        this.numOfComponents = this.components.size();
     }
 
     public String getModuleCRN() {
