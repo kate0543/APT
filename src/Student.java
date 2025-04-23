@@ -199,6 +199,7 @@ public class Student {
         for (Module module : modules) {
             for (Component component : module.getComponents()) {
                 if (component != null && component.hasFailed()) {
+                    component.updateComponentInfo();
                     this.failedComponents.add(component);
                 }
             }
