@@ -1,40 +1,53 @@
 package src;
 
+// The Component class represents a module component with various attributes such as code, title, type, result, etc.
 public class Component {
-    private String moduleCode;       // Module code to which this component belongs
-    private String componentCode;    // Unique code for the component
-    private String componentName;    // Name of the component (optional)
+    private String moduleID;       // Module code to which this component belongs
+    private String moduleCRN;        // Course Reference Number (CRN) for the module
+
+    private String componentCode="";    // Unique code for the component
+    private String componentTitle;   // Name of the component (optional)
     private String componentType;    // Type of the component (e.g., Lecture, Lab, Assignment)
-    private String componentResult;  // Result of the component
-    private String deadline;         // Deadline for the component
-    private String status;           // Status of the component
-    private double score;            // Score of the component
+    private String componentDeadline; // Deadline for the component
+    private String componentStatus;   // Status of the component, submitted or not
+    private boolean componentPassed = false;    // Indicates if the component was passed or not (optional)
+    private String componentRecord;  // raw component result with submission status
+    private Integer componentScore;    // Converted Score of the component
 
-    // No-argument constructor
+    private boolean componentPMC;    // Personal Mitigation Plan
+    private boolean componentRAP;    // Reasonable Academic Practice
+    private boolean componentIYR=false;    // In-Year Retrieval
+
+    // Empty constructor
     public Component() {
-        // Initialize fields with default values if necessary
     }
-
-    // Constructor with all fields
-    public Component(String componentCode, String componentName, String componentType, String deadline, String status, double score) {
-        this.componentCode = componentCode;
-        this.componentName = componentName;
-        this.componentType = componentType;
-        this.deadline = deadline;
-        this.status = status;
-        this.score = score;
-    }
-
-    // Getters and setters for moduleCode
+// Constructor with moduleCRN, componentTitle, and componentScore
+public Component(String moduleCRN, String moduleID, String componentTitle, String rawRecord) {
+    this.moduleCRN = moduleCRN;
+    this.moduleID = moduleID;
+    this.componentTitle = componentTitle;
+    this.componentRecord = rawRecord;
+    this.updateComponentInfo();
+    // Initialize other fields to default values if necessary
+}
+ 
+    // Getters and Setters
     public String getModuleCode() {
-        return moduleCode;
+        return moduleID;
     }
 
-    public void setModuleCode(String moduleCode) {
-        this.moduleCode = moduleCode;
+    public void setModuleCode(String moduleID) {
+        this.moduleID = moduleID;
     }
 
-    // Getters and setters for componentCode
+    public String getModuleCRN() {
+        return moduleCRN;
+    }
+
+    public void setModuleCRN(String moduleCRN) {
+        this.moduleCRN = moduleCRN;
+    }
+
     public String getComponentCode() {
         return componentCode;
     }
@@ -43,16 +56,14 @@ public class Component {
         this.componentCode = componentCode;
     }
 
-    // Getters and setters for componentName
-    public String getComponentName() {
-        return componentName;
+    public String getComponentTitle() {
+        return componentTitle;
     }
 
-    public void setComponentName(String componentName) {
-        this.componentName = componentName;
+    public void setComponentTitle(String componentTitle) {
+        this.componentTitle = componentTitle;
     }
 
-    // Getters and setters for componentType
     public String getComponentType() {
         return componentType;
     }
@@ -61,54 +72,129 @@ public class Component {
         this.componentType = componentType;
     }
 
-    // Getters and setters for componentResult
-    public String getComponentResult() {
-        return componentResult;
+    public String getComponentRecord() {
+        return componentRecord;
     }
 
-    public void setComponentResult(String componentResult) {
-        this.componentResult = componentResult;
+    public void setComponentRecord(String componentResult) {
+        this.componentRecord = componentResult;
     }
 
-    // Getters and setters for deadline
-    public String getDeadline() {
-        return deadline;
+    public String getComponentDeadline() {
+        return componentDeadline;
     }
 
-    public void setDeadline(String deadline) {
-        this.deadline = deadline;
+    public void setComponentDeadline(String componentDeadline) {
+        this.componentDeadline = componentDeadline;
     }
 
-    // Getters and setters for status
-    public String getStatus() {
-        return status;
+    public String getComponentStatus() {
+        return componentStatus;
     }
 
-    public void setStatus(String status) {
-        this.status = status;
+    public void setComponentStatus(String componentStatus) {
+        this.componentStatus = componentStatus;
     }
 
-    // Getters and setters for score
-    public double getScore() {
-        return score;
+    public double getComponentScore() {
+        return componentScore;
     }
 
-    public void setScore(double score) {
-        this.score = score;
+    public void setComponentScore(Integer componentScore) {
+        this.componentScore = componentScore;
     }
 
-    // Override toString for better readability
+    public boolean isComponentPMC() {
+        return componentPMC;
+    }
+
+    public void setComponentPMC(boolean componentPMC) {
+        this.componentPMC = componentPMC;
+    }
+
+    public boolean isComponentRAP() {
+        return componentRAP;
+    }
+
+    public void setComponentRAP(boolean componentRAP) {
+        this.componentRAP = componentRAP;
+    }
+
+    public boolean isComponentIYR() {
+        return componentIYR;
+    }
+
+    public void setComponentIYR(boolean componentIYR) {
+        this.componentIYR = componentIYR;
+    }
+
+    public void updateComponentInfo() {
+        boolean passed = false;
+        if (componentRecord != null) {
+            try {
+                int score = Integer.parseInt(componentRecord.replaceAll("[^\\d]", ""));
+                System.out.println("Score: " + score);
+                this.componentScore = score;
+                this.componentPassed = score > 40;
+            } catch (NumberFormatException e) {
+                // Not a number, passed remains false
+            }
+        }
+
+        // Update componentStatus based on componentResult
+        if (componentRecord != null) {
+            if (componentRecord.contains("NS")) {
+                componentStatus = "NS";
+            } else if (componentRecord.contains("MM")) {
+                componentStatus = "Running";
+            }
+            if (componentRecord.contains("**")) {
+                if (componentStatus == null || componentStatus.isEmpty()) {
+                    componentStatus = "Resit";
+                } else if (!componentStatus.contains("Resit")) {
+                    componentStatus += ",Resit";
+                }
+            }
+            if(componentPassed){
+                componentStatus = "Submitted";
+            }
+        }   
+ 
+        System.out.println("Component Info Updated: " + this.toString());
+        
+
+    }
+    public boolean hasFailed() {      
+          
+        if (this.componentRecord!= null && this.componentRecord.contains("MM")) { 
+                    return false; // Running component, not failed
+        }
+        if (this.componentScore  != null) { 
+
+                return this.componentScore < 40; 
+        }  
+        return false; // Default to true if score is null
+    }
+
+
+
+    // toString method
     @Override
     public String toString() {
         return "Component{" +
-               "moduleCode='" + moduleCode + '\'' +
-               ", componentCode='" + componentCode + '\'' +
-               ", componentName='" + componentName + '\'' +
-               ", componentType='" + componentType + '\'' +
-               ", componentResult='" + componentResult + '\'' +
-               ", deadline='" + deadline + '\'' +
-               ", status='" + status + '\'' +
-               ", score=" + score +
-               '}';
+                // "moduleID='" + moduleID + '\'' +
+                ", moduleCRN='" + moduleCRN + '\'' +
+                // ", componentCode='" + componentCode + '\'' +
+                ", componentTitle='" + componentTitle + '\'' +
+                // ", componentType='" + componentType + '\'' +
+                (componentDeadline != null && !componentDeadline.isEmpty() ? ", componentDeadline='" + componentDeadline + '\'' : ", componentDeadline='not found'") +
+                ", componentPassed=" + componentPassed +
+                ", componentStatus='" + componentStatus + '\'' +
+                ", componentScore=" + componentScore +
+                // ", componentPMC=" + componentPMC +
+                // ", componentRAP=" + componentRAP +  
+                ", componentIYR=" + componentIYR +
+                ", componentRecord='" + componentRecord + '\'' +
+                '}';
     }
 }

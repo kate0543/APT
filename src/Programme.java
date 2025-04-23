@@ -1,20 +1,29 @@
 package src;
 
-import java.util.ArrayList;
-import java.util.List;
-
+/**
+ * Represents a Programme with details such as code, title, year, school, and term.
+ */
 public class Programme {
     private String programmeCode; // Code of the programme
-    private String programmeName; // Name of the programme
+    private String programmeTitle; // Title of the programme
     private int programmeYear;    // Year of the programme
-    private List<Student> students; // List of students in the programme
+    private String programmeSchool; // School offering the programme
+    private String programmeTerm; // Term of the programme
 
-    // Default constructor
+    // Empty constructor
     public Programme() {
-        this.students = new ArrayList<>();
     }
 
-    // Getters and setters
+    // Non-empty constructor
+    public Programme(String programmeCode, String programmeTitle, int programmeYear, String programmeSchool, String programmeTerm) {
+        this.programmeCode = programmeCode;
+        this.programmeTitle = programmeTitle;
+        this.programmeYear = programmeYear;
+        this.programmeSchool = programmeSchool;
+        this.programmeTerm = programmeTerm;
+    }
+
+    // Getters and Setters
     public String getProgrammeCode() {
         return programmeCode;
     }
@@ -23,12 +32,12 @@ public class Programme {
         this.programmeCode = programmeCode;
     }
 
-    public String getProgrammeName() {
-        return programmeName;
+    public String getProgrammeTitle() {
+        return programmeTitle;
     }
 
-    public void setProgrammeName(String programmeName) {
-        this.programmeName = programmeName;
+    public void setProgrammeTitle(String programmeTitle) {
+        this.programmeTitle = programmeTitle;
     }
 
     public int getProgrammeYear() {
@@ -39,19 +48,31 @@ public class Programme {
         this.programmeYear = programmeYear;
     }
 
-    public List<Student> getStudents() {
-        return students;
+    public String getProgrammeSchool() {
+        return programmeSchool;
     }
 
-    // Add a student to the programme
-    public void addStudent(Student student) {
-        this.students.add(student);
+    public void setProgrammeSchool(String programmeSchool) {
+        this.programmeSchool = programmeSchool;
     }
 
-    // Override toString method for better representation
+    public String getProgrammeTerm() {
+        return programmeTerm;
+    }
+
+    public void setProgrammeTerm(String programmeTerm) {
+        this.programmeTerm = programmeTerm;
+    }
+
+    // toString method
     @Override
     public String toString() {
-        return "Programme{programmeCode='" + programmeCode + "', programmeName='" + programmeName +
-               "', programmeYear=" + programmeYear + ", students=" + students + "}";
+        return "Programme{" +
+                "programmeCode='" + programmeCode + '\'' +
+                ", programmeTitle='" + programmeTitle + '\'' +
+                ", programmeYear=" + programmeYear +
+                ", programmeSchool='" + programmeSchool + '\'' +
+                ", programmeTerm='" + programmeTerm + '\'' +
+                '}';
     }
 }
