@@ -203,7 +203,6 @@ public class Qlikview {
 
                 if (bannerID == 0) {
                     System.err.println("Invalid Banner ID: " + bannerID);
-                    System.err.println("___________________________________________________________________________________________________");
                     continue; // Skip if Banner ID is invalid
                 }
 
@@ -241,8 +240,7 @@ public class Qlikview {
                                 : null,
                         columnIndexMap.containsKey("Reg Status") && !fields[columnIndexMap.get("Reg Status")].trim().isEmpty()
                                 ? fields[columnIndexMap.get("Reg Status")].trim()
-                                : null,
-                        null // Module mark is optional and not provided in the CSV
+                                : null
                 );
 
                 for (Student student : students) {
