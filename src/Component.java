@@ -14,7 +14,7 @@ public class Component {
     private String componentStatus;     // Status of the component, submitted or not
     private boolean componentPassed = false; // Indicates if the component was passed or not (optional)
     private String componentRecord;     // Raw component result with submission status
-    private Integer componentScore;     // Converted Score of the component
+    private Integer componentScore=0;     // Converted Score of the component
 
     private boolean componentPMC;       // Personal Mitigation Plan
     private boolean componentRAP;       // Reasonable Academic Practice
@@ -30,8 +30,7 @@ public class Component {
      * Constructor with moduleCRN, moduleID, componentTitle, and rawRecord.
      */
     public Component(String moduleCRN, String moduleID, String componentTitle, String rawRecord) {
-        this.moduleCRN = moduleCRN;
-        this.moduleID = moduleID;
+        this.moduleCRN = moduleCRN; 
         this.componentTitle = componentTitle;
         this.componentRecord = rawRecord;
         this.updateComponentInfo();
@@ -142,7 +141,6 @@ public class Component {
         if (componentRecord != null) {
             try {
                 int score = Integer.parseInt(componentRecord.replaceAll("[^\\d]", ""));
-                System.out.println("Score: " + score);
                 this.componentScore = score;
                 this.componentPassed = score > 40;
             } catch (NumberFormatException e) {
@@ -154,9 +152,12 @@ public class Component {
         if (componentRecord != null) {
             if (componentRecord.contains("NS")) {
                 componentStatus = "NS";
-            } else if (componentRecord.contains("MM")) {
+            } else if (componentScore== 0) {
+                // No score, not submitted, currently running not failed
                 componentStatus = "Running";
+                this.componentPassed = true;
             }
+            
             if (componentRecord.contains("**")) {
                 if (componentStatus == null || componentStatus.isEmpty()) {
                     componentStatus = "Resit";
@@ -169,7 +170,7 @@ public class Component {
             }
         }
 
-        System.out.println("Component Info Updated: " + this.toString());
+        // System.out.println("Component Info Updated: " + this.toString());
     }
 
     /**
