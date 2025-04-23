@@ -3,20 +3,22 @@ package src;
 import java.io.*;
 import java.util.*;
 
-// TODO; record which module is trailing
+// TODO: Record which module is trailing
 
 public class Qlikview {
     public static void main(String[] args) {
         String baseFolderPath = "data/BMT/"; // Replace with the actual base folder path
         List<String> targetProgrammeCodesList = List.of("BMT.S", "BMT.F"); // Replace with the actual target programme codes
         List<Student> students = new ArrayList<>(); // List to store all students
+
         try {
             students = fetchStudents(baseFolderPath, targetProgrammeCodesList);
 
             if (!students.isEmpty()) {
                 for (Student student : students) {
+                    // Uncomment to print students with trailing modules
                     // if (!student.getTrailingModules().isEmpty()) {
-                        // System.out.println("Student: " + student.getBannerID() + " has " + student.getTrailingModules().size() + " trailing modules: " + student.getTrailingModules());
+                    //     System.out.println("Student: " + student.getBannerID() + " has " + student.getTrailingModules().size() + " trailing modules: " + student.getTrailingModules());
                     // }
                 }
             } else {
@@ -26,26 +28,27 @@ public class Qlikview {
             System.err.println("An error occurred while reading Qlikview data: " + e.getMessage());
             e.printStackTrace();
         }
+
+        // Uncomment to print all students' details
         // for (Student student : students) {
-        //     System.out.println(student); // Print each student's details
+        //     System.out.println(student);
         // }
-        for (Student student : students) { 
+
+        for (Student student : students) {
             if (student.getBannerID() == 654875) { // Compare int using ==
-        
-                System.out.println("Student ID: " + student.toString());
-                for(Module module : student.getModules()) {
-                    // if(module.getModuleCRN().equals("59131")) {
-           
+                System.out.println("Student ID: " + student);
+                for (Module module : student.getModules()) {
+                    // Uncomment to filter by module CRN
+                    // if (module.getModuleCRN().equals("59131")) {
                     System.out.println("Module: " + module.getModuleTitle());
- 
-                // }
+                    // }
+                }
             }
-     }
-}
+        }
     }
-    
-    public static List<Student> fetchStudents(String baseFolderPath, List<String> targetProgrammeCodesList) throws IOException { 
-        List<Student> students = new ArrayList<>(); // List to store all students
+
+    public static List<Student> fetchStudents(String baseFolderPath, List<String> targetProgrammeCodesList) throws IOException {
+        List<Student> students = new ArrayList<>();
 
         for (String targetProgrammeCode : targetProgrammeCodesList) {
             try {
@@ -57,16 +60,15 @@ public class Qlikview {
             }
         }
 
-
         if (!students.isEmpty()) {
             for (Student student : students) {
                 student.checkTrailingModules(); // Calculate trailing status for each student
             }
         } else {
             System.out.println("No students found for the specified programme codes.");
-        }        
-        System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+        }
 
+        System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
         System.out.println("            Qlikview Data processing completed.");
         System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
 
@@ -80,13 +82,9 @@ public class Qlikview {
         File[] files = folder.listFiles((dir, name) -> name.endsWith(".csv") && name.contains(targetProgrammeCode));
 
         if (files != null && files.length > 0) {
- 
             for (File file : files) {
-                if (file.getName().contains(targetProgrammeCode)) {
-
-                    if (file.getName().contains("Programme")) {
-                        students.addAll(readProgrammeData(file)); // Read programme data from the file
-                    }
+                if (file.getName().contains(targetProgrammeCode) && file.getName().contains("Programme")) {
+                    students.addAll(readProgrammeData(file)); // Read programme data from the file
                 }
             }
             for (File file : files) {
@@ -206,7 +204,6 @@ public class Qlikview {
                 if (bannerID == 0) {
                     System.err.println("Invalid Banner ID: " + bannerID);
                     System.err.println("___________________________________________________________________________________________________");
-
                     continue; // Skip if Banner ID is invalid
                 }
 
@@ -246,7 +243,7 @@ public class Qlikview {
                                 ? fields[columnIndexMap.get("Reg Status")].trim()
                                 : null,
                         null // Module mark is optional and not provided in the CSV
-                ); 
+                );
 
                 for (Student student : students) {
                     if (student.getBannerID() == bannerID) {
