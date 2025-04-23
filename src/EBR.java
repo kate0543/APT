@@ -3,7 +3,9 @@ package src;
 import java.io.*;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class EBR {
 
@@ -34,9 +36,10 @@ public class EBR {
 
         for (Student student : students) {
             for (Module module : student.getModules()) {
-                for (Component component : module.getComponents()) {
-                    System.out.println("Component: " + component.toString());
-                }
+                System.out.println("Module: " + module.toString());
+                // for (Component component : module.getComponents()) {
+                //     System.out.println("Component: " + component.toString());
+                // }
             }
         }
     }
@@ -47,10 +50,10 @@ public class EBR {
     public static List<Student> fetchStudents(List<Student> students, String baseFolderPath, List<String> targetProgrammeCodesList) throws IOException {
         for (String targetProgrammeCode : targetProgrammeCodesList) {
             try {
-                List<File> files = locateEBRFiles(baseFolderPath + "/EBR", targetProgrammeCode);
+                List<File> files = locateEBRFiles(baseFolderPath + "/EBR", "ModuleReport",targetProgrammeCode);
                 students = addComponentsToStudents(files, students);
             } catch (IOException e) {
-                System.err.println("An error occurred while processing EBR files: " + e.getMessage());
+                System.err.println("An error occurred while processing EBR Module Report files: " + e.getMessage());
                 e.printStackTrace();
             }
         }
@@ -60,7 +63,26 @@ public class EBR {
             }
         }
         System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
-        System.out.println("                                EBR Data processing completed.");
+        System.out.println("                                EBR Module Reports Data processing completed.");
+        System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+
+
+        for (String targetProgrammeCode : targetProgrammeCodesList) {
+            try {
+                List<File> files = locateEBRFiles(baseFolderPath + "/EBR", "ProgrammeReport",targetProgrammeCode);
+                students = processProgrammeReport(files, students);
+            } catch (IOException e) {
+                System.err.println("An error occurred while processing EBR Porgramme files: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+        if (!students.isEmpty()) {
+            for (Student student : students) {
+                student.checkFailedComponents(); // Check for failed modules
+            }
+        }
+        System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+        System.out.println("                                EBR Module Reports Data processing completed.");
         System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
 
         return students;
@@ -73,7 +95,7 @@ public class EBR {
     /**
      * Locates EBR files for a given programme code.
      */
-    public static List<File> locateEBRFiles(String folderPath, String targetProgrammeCode) throws IOException {
+    public static List<File> locateEBRFiles(String folderPath, String reportType, String targetProgrammeCode) throws IOException {
         List<File> matchingFiles = new ArrayList<>();
         File folder = new File(folderPath);
 
@@ -89,7 +111,7 @@ public class EBR {
         // Filter files containing the target programme code and ending with .csv
         for (File file : files) {
             if (file.isFile()) {
-                if (file.getName().contains("ModuleReport")) {
+                if (file.getName().contains(reportType)) {
                     String fileName = file.getName();
                     if (!(fileName.contains(targetProgrammeCode) && fileName.endsWith(".csv"))) {
                         continue; // Skip files that do not match the criteria
@@ -126,8 +148,139 @@ public class EBR {
         });
 
         return matchingFiles;
-    }
+    } 
+private static List<Student> processProgrammeReport(List<File> files, List<Student> students) {
+    for (File file : files) {
+        try {
+            System.out.println("Processing Programme Report file: " + file.getName());
+            List<String> lines = Files.readAllLines(file.toPath());
+            if (lines.size() < 15) {
+                System.out.println("Skipping file - insufficient lines: " + file.getName());
+                continue;
+            }
 
+            // Extract programme information using extractValue helper
+            String programmeTitle = extractValue(lines, "Programme title");
+            if (programmeTitle.isEmpty()) {
+                System.out.println("Programme title is empty in file: " + file.getName());
+                continue;
+            }
+            String programmeCode = extractValue(lines, "Programme code");
+            String programmeLevel = extractValue(lines, "Programme level");
+            System.out.println("Programme: " + programmeTitle +
+                               " (" + programmeCode + ") Level: " + programmeLevel);
+
+            // Locate the "Module code" line
+            int moduleCRNLine = -1;
+            for (int i = 0; i < lines.size(); i++) {
+                if (lines.get(i).toLowerCase().contains("module code")) {
+                    moduleCRNLine = i;
+                    break;
+                }
+            }
+            if (moduleCRNLine == -1) {
+                System.out.println("Could not find Module code line in file: " + file.getName());
+                continue;
+            }
+
+            // Extract the CRNs and their positions
+            String[] crnFields = lines.get(moduleCRNLine).split(",");
+            List<String> validModuleCRNs = new ArrayList<>();
+            List<Integer> moduleCRNPositions = new ArrayList<>();
+            for (int i = 4; i < crnFields.length; i++) {
+                String crn = crnFields[i].trim();
+                if (crn.matches("\\d+")) {
+                    validModuleCRNs.add(crn);
+                    moduleCRNPositions.add(i);
+                }
+            }
+            System.out.println("Found " + validModuleCRNs.size() +
+                               " module CRNs: " + String.join(", ", validModuleCRNs));
+
+            // Find where student data begins (lines that start with "@")
+            int studentDataStart = -1;
+            for (int i = moduleCRNLine + 2; i < lines.size(); i++) {
+                if (lines.get(i).startsWith("@")) {
+                    studentDataStart = i;
+                    break;
+                }
+            }
+            if (studentDataStart == -1) {
+                System.out.println("Could not find student data in file: " + file.getName());
+                continue;
+            }
+
+            // Process each student record
+            for (int i = studentDataStart; i < lines.size(); i++) {
+                String line = lines.get(i);
+                if (!line.startsWith("@")) continue;
+                String[] fields = line.split(",");
+                if (fields.length < 5) continue;
+
+                // Parse Banner ID
+                String rawId = fields[0].replace("@", "").replaceFirst("^0+(?!$)", "");
+                int bannerId;
+                try {
+                    bannerId = Integer.parseInt(rawId);
+                } catch (NumberFormatException e) {
+                    System.out.println("Invalid Banner ID: " + fields[0]);
+                    continue;
+                }
+
+                Student student = DataPipeline.findStudentById(students, bannerId);
+                if (student == null) {
+                    System.out.println("Student not found: " + bannerId);
+                    continue;
+                }
+
+                // Update each module record for this student
+                for (int j = 0; j < validModuleCRNs.size(); j++) {
+                    String moduleCRN = validModuleCRNs.get(j);
+                    int pos = moduleCRNPositions.get(j);
+                    if (pos >= fields.length) continue;
+                    String record = fields[pos].trim();
+                    if (record.isEmpty()) continue;
+
+                    // Clean up format
+                    record = record.replace("*", "").replace("R", "").trim();
+
+                    // Locate the Module object and update if not yet updated
+                    Module module = findModuleByModuleCRN(student, moduleCRN);
+                    if (module != null && !module.getModuleInfoUpdated()) {
+                        module.setModuleRecord(record);
+                        module.updateModuleInfo();
+                        System.out.println("Updated module " + moduleCRN +
+                                           " for student " + bannerId +
+                                           " with record: " + record);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Error processing Programme Report file " +
+                                file.getName() + ": " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    return students;
+}
+private static String extractValue(List<String> lines, String key) {
+    for (String line : lines) {
+        String[] parts = line.split(",");
+        if (parts.length > 1 && parts[0].trim().equals(key)) {
+            return parts[1].trim();
+        }
+    }
+    return "";
+}
+
+private static Module findModuleByModuleCRN(Student student, String moduleCRN) {
+    for (Module module : student.getModules()) {
+        if (module.getModuleCRN() != null && module.getModuleCRN().equals(moduleCRN)) {
+            return module;
+        }
+    }
+    return null;
+}
     /**
      * Adds component information from CSV files to students.
      */
@@ -275,6 +428,7 @@ public class EBR {
 
         return students;
     }
+
 
     /**
      * Parses a Banner ID from a raw string.
