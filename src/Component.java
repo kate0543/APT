@@ -1,37 +1,44 @@
 package src;
 
-// The Component class represents a module component with various attributes such as code, title, type, result, etc.
+/**
+ * The Component class represents a module component with various attributes such as code, title, type, result, etc.
+ */
 public class Component {
-    private String moduleID;       // Module code to which this component belongs
-    private String moduleCRN;        // Course Reference Number (CRN) for the module
+    private String moduleID;            // Module code to which this component belongs
+    private String moduleCRN;           // Course Reference Number (CRN) for the module
 
-    private String componentCode="";    // Unique code for the component
-    private String componentTitle;   // Name of the component (optional)
-    private String componentType;    // Type of the component (e.g., Lecture, Lab, Assignment)
-    private String componentDeadline; // Deadline for the component
-    private String componentStatus;   // Status of the component, submitted or not
-    private boolean componentPassed = false;    // Indicates if the component was passed or not (optional)
-    private String componentRecord;  // raw component result with submission status
-    private Integer componentScore;    // Converted Score of the component
+    private String componentCode = "";  // Unique code for the component
+    private String componentTitle;      // Name of the component (optional)
+    private String componentType;       // Type of the component (e.g., Lecture, Lab, Assignment)
+    private String componentDeadline;   // Deadline for the component
+    private String componentStatus;     // Status of the component, submitted or not
+    private boolean componentPassed = false; // Indicates if the component was passed or not (optional)
+    private String componentRecord;     // Raw component result with submission status
+    private Integer componentScore;     // Converted Score of the component
 
-    private boolean componentPMC;    // Personal Mitigation Plan
-    private boolean componentRAP;    // Reasonable Academic Practice
-    private boolean componentIYR=false;    // In-Year Retrieval
+    private boolean componentPMC;       // Personal Mitigation Plan
+    private boolean componentRAP;       // Reasonable Academic Practice
+    private boolean componentIYR = false; // In-Year Retrieval
 
-    // Empty constructor
+    /**
+     * Empty constructor.
+     */
     public Component() {
     }
-// Constructor with moduleCRN, componentTitle, and componentScore
-public Component(String moduleCRN, String moduleID, String componentTitle, String rawRecord) {
-    this.moduleCRN = moduleCRN;
-    this.moduleID = moduleID;
-    this.componentTitle = componentTitle;
-    this.componentRecord = rawRecord;
-    this.updateComponentInfo();
-    // Initialize other fields to default values if necessary
-}
- 
+
+    /**
+     * Constructor with moduleCRN, moduleID, componentTitle, and rawRecord.
+     */
+    public Component(String moduleCRN, String moduleID, String componentTitle, String rawRecord) {
+        this.moduleCRN = moduleCRN;
+        this.moduleID = moduleID;
+        this.componentTitle = componentTitle;
+        this.componentRecord = rawRecord;
+        this.updateComponentInfo();
+    }
+
     // Getters and Setters
+
     public String getModuleCode() {
         return moduleID;
     }
@@ -76,8 +83,8 @@ public Component(String moduleCRN, String moduleID, String componentTitle, Strin
         return componentRecord;
     }
 
-    public void setComponentRecord(String componentResult) {
-        this.componentRecord = componentResult;
+    public void setComponentRecord(String componentRecord) {
+        this.componentRecord = componentRecord;
     }
 
     public String getComponentDeadline() {
@@ -128,8 +135,10 @@ public Component(String moduleCRN, String moduleID, String componentTitle, Strin
         this.componentIYR = componentIYR;
     }
 
+    /**
+     * Updates component information based on the raw record.
+     */
     public void updateComponentInfo() {
-        boolean passed = false;
         if (componentRecord != null) {
             try {
                 int score = Integer.parseInt(componentRecord.replaceAll("[^\\d]", ""));
@@ -141,7 +150,7 @@ public Component(String moduleCRN, String moduleID, String componentTitle, Strin
             }
         }
 
-        // Update componentStatus based on componentResult
+        // Update componentStatus based on componentRecord
         if (componentRecord != null) {
             if (componentRecord.contains("NS")) {
                 componentStatus = "NS";
@@ -155,44 +164,39 @@ public Component(String moduleCRN, String moduleID, String componentTitle, Strin
                     componentStatus += ",Resit";
                 }
             }
-            if(componentPassed){
+            if (componentPassed) {
                 componentStatus = "Submitted";
             }
-        }   
- 
-        System.out.println("Component Info Updated: " + this.toString());
-        
-
-    }
-    public boolean hasFailed() {      
-          
-        if (this.componentRecord!= null && this.componentRecord.contains("MM")) { 
-                    return false; // Running component, not failed
         }
-        if (this.componentScore  != null) { 
 
-                return this.componentScore < 40; 
-        }  
-        return false; // Default to true if score is null
+        System.out.println("Component Info Updated: " + this.toString());
     }
 
+    /**
+     * Checks if the component has failed.
+     * @return true if failed, false otherwise
+     */
+    public boolean hasFailed() {
+        if (this.componentRecord != null && this.componentRecord.contains("MM")) {
+            return false; // Running component, not failed
+        }
+        if (this.componentScore != null) {
+            return this.componentScore < 40;
+        }
+        return false; // Default to false if score is null
+    }
 
-
-    // toString method
     @Override
     public String toString() {
         return "Component{" +
-                // "moduleID='" + moduleID + '\'' +
                 ", moduleCRN='" + moduleCRN + '\'' +
-                // ", componentCode='" + componentCode + '\'' +
                 ", componentTitle='" + componentTitle + '\'' +
-                // ", componentType='" + componentType + '\'' +
-                (componentDeadline != null && !componentDeadline.isEmpty() ? ", componentDeadline='" + componentDeadline + '\'' : ", componentDeadline='not found'") +
+                (componentDeadline != null && !componentDeadline.isEmpty()
+                        ? ", componentDeadline='" + componentDeadline + '\''
+                        : ", componentDeadline='not found'") +
                 ", componentPassed=" + componentPassed +
                 ", componentStatus='" + componentStatus + '\'' +
                 ", componentScore=" + componentScore +
-                // ", componentPMC=" + componentPMC +
-                // ", componentRAP=" + componentRAP +  
                 ", componentIYR=" + componentIYR +
                 ", componentRecord='" + componentRecord + '\'' +
                 '}';
