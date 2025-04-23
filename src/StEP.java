@@ -28,6 +28,10 @@ public class StEP {
      * Fetch students and process attendance files.
      */
     public static List<Student> fetchStudents(List<Student> students, String baseFolderPath, List<String> targetProgrammeCodesList) throws IOException {
+        
+        students = Qlikview.fetchStudents(baseFolderPath, targetProgrammeCodesList);
+        students = EBR.fetchStudentsMR(students, baseFolderPath, targetProgrammeCodesList);
+        
         students = SourceDoc.fetchStudents(students, baseFolderPath, targetProgrammeCodesList);
 
         List<File> matchingFiles = new ArrayList<>();
