@@ -3,10 +3,13 @@ package src;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Represents a module with its details and associated components.
+ */
 public class Module {
     // Fields
     private String programmeCode; // Programme code associated with the module (optional)
-    private List<Component> components=new ArrayList<>(); // List of components (e.g., lectures, labs) associated with the module
+    private List<Component> components = new ArrayList<>(); // List of components (e.g., lectures, labs) associated with the module
 
     private String moduleCRN; // Course Reference Number (CRN) for the module
     private String moduleID; // Unique identifier for the module
@@ -21,14 +24,20 @@ public class Module {
     private String moduleMark; // Overall mark for the module (optional)
     private String moduleLeader; // Name of the module leader
     private String moduleAdminTeam; // Name of the module admin team
-    private Integer numOfComponents=0; // Flag indicating if component details are loaded
+    private Integer numOfComponents = 0; // Number of components
     private boolean componentDetailsLoaded = false; // Flag indicating if component details are loaded for the student
 
+    // Constructors
 
-    // Empty constructor
+    /**
+     * Empty constructor.
+     */
     public Module() {
     }
-    // Constructor with parameters
+
+    /**
+     * Constructor with parameters.
+     */
     public Module(String programmeCode, List<Component> components, String moduleCRN, String moduleID,
                   String moduleTitle, int moduleYear, String moduleLevel, String moduleEnrollment,
                   String moduleCredit, String moduleSchool, String moduleTerm, String moduleRegStatus,
@@ -47,15 +56,11 @@ public class Module {
         this.moduleTerm = moduleTerm;
         this.moduleRegStatus = moduleRegStatus;
         this.moduleMark = moduleMark;
-        
-        // Initialize optional fields not included in this specific constructor if needed
-        // this.moduleLeader = null; // Or some default value
-        // this.moduleAdminTeam = null; // Or some default value
     }
 
     // Getters and Setters
 
-        /**
+    /**
      * Checks if the component details have been loaded for this student.
      * @return true if component details are loaded, false otherwise.
      */
@@ -66,6 +71,7 @@ public class Module {
     public void setComponentDetailsLoaded(boolean componentDetailsLoaded) {
         this.componentDetailsLoaded = componentDetailsLoaded;
     }
+
     public Integer getNumOfComponents() {
         return numOfComponents;
     }
@@ -85,11 +91,13 @@ public class Module {
     public List<Component> getComponents() {
         return components;
     }
+
     public void addComponent(Component component) {
         this.components.add(component);
     }
+
     public void setComponents(List<Component> components) {
-        this.components = components;
+        this.components = (components != null) ? new ArrayList<>(components) : new ArrayList<>();
     }
 
     public String getModuleCRN() {
@@ -187,6 +195,7 @@ public class Module {
     public void setModuleLeader(String moduleLeader) {
         this.moduleLeader = moduleLeader;
     }
+
     public String getModuleAdminTeam() {
         return moduleAdminTeam;
     }
@@ -195,9 +204,8 @@ public class Module {
         this.moduleAdminTeam = moduleAdminTeam;
     }
 
- 
-
     // toString method
+
     @Override
     public String toString() {
         return "Module{" +
@@ -206,7 +214,7 @@ public class Module {
                 ", moduleCRN='" + moduleCRN + '\'' +
                 ", moduleID='" + moduleID + '\'' +
                 ", moduleTitle='" + moduleTitle + '\'' +
-                // "moduleAdminTeam=' "+  moduleAdminTeam + '\'' +  
+                // ", moduleAdminTeam='" + moduleAdminTeam + '\'' +
                 // ", moduleLeader='" + moduleLeader + '\'' +
                 // ", moduleYear=" + moduleYear +
                 ", moduleLevel='" + moduleLevel + '\'' +
