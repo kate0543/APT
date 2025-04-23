@@ -5,12 +5,12 @@ import java.util.ArrayList;
 
 public class DataPipeline {
     static List<Student> priorityStudents = new ArrayList<>(); // List to hold student objects
+
     public static void main(String[] args) {
         String baseFolderPath = "data/BMT/";
-        List<String> targetProgrammeCodesList = List.of("BMT.S", "BMT.F"); // Replace with the actual target programme codes
+        List<String> targetProgrammeCodesList = List.of("BMT.S", "BMT.F"); // Target programme codes
 
-        // Assuming SourceDoc.fetchStudents is a static method that returns List<Student>
-        // Adjusted to match the method signature: fetchStudents(List<Student>, String, List<String>)
+        // Fetch students
         List<Student> students = new ArrayList<>();
         try {
             students = StEP.fetchStudents(students, baseFolderPath, targetProgrammeCodesList);
@@ -24,8 +24,9 @@ public class DataPipeline {
 
         System.out.println("=== Priority Students ===");
         priorityStudents = pipeline.fetchPriorityStudents(students);
-        for (Student student : priorityStudents) 
-            System.out.println("Student ID: " + student.getBannerID() + ", Priority Reason: " + student.getPriorityReasons() );
+        for (Student student : priorityStudents) {
+            System.out.println("Student ID: " + student.getBannerID() + ", Priority Reason: " + student.getPriorityReasons());
+        }
         System.out.println("Total Priority Students: " + priorityStudents.size());
 
         System.out.println("\n=== Priority Students with Overdue Components ===");
@@ -36,31 +37,36 @@ public class DataPipeline {
         }
     }
 
-    
+    /**
+     * Calculates priority reasons for a student.
+     * @param student The student to evaluate.
+     * @return List of reasons for priority.
+     */
     public static List<String> calculatePriorityGroup(Student student) {
         List<String> reasons = new ArrayList<>();
 
-        // Priority if last term attendance rate is less than 50
+        // Example: Uncomment and adjust as needed for your logic
+
+        // Priority if last term attendance rate is less than 30%
         // if (student.getStudentLastTermAttendanceRate() < 30) {
-        
-        //     reasons.add("Attendance is low : " + student.getStudentLastTermAttendanceRate() + "%");
+        //     reasons.add("Attendance is low: " + student.getStudentLastTermAttendanceRate() + "%");
         // }
 
-        // // Priority if registration status is "new"
+        // Priority if registration status is "new"
         // if (student.getProgrammeRegStatus() != null && student.getProgrammeRegStatus().equalsIgnoreCase("new")) {
         //     reasons.add("New registration status");
         // }
 
-        // // Priority if student has trailing modules
+        // Priority if student has trailing modules
         // if (student.isTrailing()) {
         //     reasons.add("Has trailing modules");
         // }
 
-        // // Priority if student has failed components
-        if ( student.getFailedComponents().size() != 0) {
-            for(Module module : student.getModules()){
-                for(Component component : module.getComponents()){
-                    if(!component.hasFailed()){
+        // Priority if student has failed components
+        if (student.getFailedComponents().size() != 0) {
+            for (Module module : student.getModules()) {
+                for (Component component : module.getComponents()) {
+                    if (!component.hasFailed()) {
                         reasons.add("Has failed components: " + component.getComponentTitle() + " in module: " + module.getModuleTitle());
                     }
                 }
@@ -68,12 +74,12 @@ public class DataPipeline {
             reasons.add("Has failed components");
         }
 
-        // // Priority if programme registration status is not "RE"
+        // Priority if programme registration status is not "RE"
         // if (student.getProgrammeRegStatus() != null && !student.getProgrammeRegStatus().equalsIgnoreCase("RE")) {
         //     reasons.add("Programme registration status not RE");
         // }
 
-        // // Priority if any module enrollment is not "RE"
+        // Priority if any module enrollment is not "RE"
         // for (Module module : student.getModules()) {
         //     if (module.getModuleEnrollment() != null && !module.getModuleEnrollment().equalsIgnoreCase("RE")) {
         //         if (!reasons.contains("Module enrollment not RE")) {
@@ -84,6 +90,12 @@ public class DataPipeline {
 
         return reasons;
     }
+
+    /**
+     * Finds students with overdue components.
+     * @param students List of students.
+     * @return List of students with overdue components.
+     */
     public List<Student> priorityUpdateComponent(List<Student> students) {
         List<Student> priorityStudents = new ArrayList<>();
         java.time.LocalDate currentDate = java.time.LocalDate.now();
@@ -104,10 +116,10 @@ public class DataPipeline {
                     if (deadline != null && deadline.isBefore(currentDate) && (status == null || !status.contains("Submitted"))) {
                         addToPriority = true;
                         priorityReason.append("Overdue component: ");
-                                    //   .append(component.getComponentTitle())
-                                    //   .append(" in module: ")
-                                    //   .append(module.getModuleTitle())
-                                    //   .append("; ");
+                        // .append(component.getComponentTitle())
+                        // .append(" in module: ")
+                        // .append(module.getModuleTitle())
+                        // .append("; ");
                         break;
                     }
                 }
@@ -116,7 +128,7 @@ public class DataPipeline {
 
             if (addToPriority) {
                 if (!priorityStudents.contains(student)) {
-                    // Assuming Student class has setPriorityReason(String) method
+                    // Assuming Student class has updateReason(String) method
                     student.updateReason(priorityReason.toString());
                     priorityStudents.add(student);
                 } else {
@@ -130,6 +142,12 @@ public class DataPipeline {
 
         return priorityStudents;
     }
+
+    /**
+     * Finds students with any priority reason.
+     * @param students List of students.
+     * @return List of students with priority reasons.
+     */
     public List<Student> fetchPriorityStudents(List<Student> students) {
         List<Student> priorityStudents = new ArrayList<>();
         for (Student student : students) {
@@ -144,15 +162,20 @@ public class DataPipeline {
         }
         return priorityStudents;
     }
+
+    /**
+     * Finds a student by Banner ID.
+     * @param students List of students.
+     * @param bannerID Banner ID to search for.
+     * @return Student with the given Banner ID, or null if not found.
+     */
     public static Student findStudentById(List<Student> students, int bannerID) {
-    for (Student student : students) {
-        // Assuming Student class has a getBannerID() method returning int
-        if (student.getBannerID() == bannerID) {
-            return student;
+        for (Student student : students) {
+            // Assuming Student class has a getBannerID() method returning int
+            if (student.getBannerID() == bannerID) {
+                return student;
+            }
         }
+        return null; // Return null if no student with the given ID is found
     }
-    return null; // Return null if no student with the given ID is found
-}
-
-
 }
