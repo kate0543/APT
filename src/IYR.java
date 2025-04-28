@@ -1,8 +1,12 @@
 package src;
 
 import java.util.*;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 
 public class IYR {
     // List to store Banner IDs found in IYR files
@@ -10,118 +14,221 @@ public class IYR {
 
     public static void main(String[] args) throws IOException {
         String baseFolderPath = "data/BMT/";
-        List<String> targetProgrammeCodesList = List.of("BMT.S", "BMT.F");
+ 
+        String targetProgrammeCode = "BMT";// Replace with the actual target programme codes
+        String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
         List<Student> students = new ArrayList<>();
-        students = SourceDoc.fetchStudents(students, baseFolderPath, targetProgrammeCodesList);
+        students = SourceDoc.fetchStudents(students, baseFolderPath, targetProgrammeCode);
+        students = fetchStudents(students, baseFolderPath, targetProgrammeCode);
+    } 
+        public static List<Student> fetchStudents(List<Student> students, String baseFolderPath, String targetProgrammeCode) {
+            String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
+            List<String> targetProgrammeCodesList = List.of(targetProgrammeCode+".S", targetProgrammeCode+".F"); // Replace with the actual target programme codes
 
-        List<File> dataFiles = locateIYRFiles(baseFolderPath);
+            List<File> dataFiles = locateIYRFiles(baseFolderPath+"IYR/",targetProgrammeCode);
 
-        students = updateIYRComponents(students, dataFiles);
+            students = updateIYRComponents(students, logFolderPath, dataFiles);
 
-        // Print details for student with BannerID 617352
-        for (Student student : students) {
-            if (student.getBannerID() == 617352) {
-                System.out.println("Student ID: " + student.getBannerID());
-                for (Module module : student.getModules()) {
-                    System.out.println("Module CRN: " + module.getModuleCRN());
-                    for (Component component : module.getComponents()) {
-                        System.out.println("Component Title: " + component.getComponentTitle());
-                        System.out.println("Component IYR: " + component.isComponentIYR());
-                    }
-                }
-            }
-        }
+            System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+            System.out.println("            IYR Data processing completed.");
+            System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+    
+            return students;
 
-        // Print IYR Banner IDs and corresponding student details
-        for (Integer id : IYR_bannerIDs) {
-            System.out.println("IYR Banner ID: " + id);
-            Student iyrStudent = DataPipeline.findStudentById(students, id);
-            if (iyrStudent != null) {
-                System.out.println("Found student with ID: " + iyrStudent.getBannerID());
-                System.err.println(iyrStudent.toString());
-            } else {
-                System.out.println("Student with ID " + id + " not found in the list.");
-            }
-        }
-
-        // Print students with IYR components
-        List<Student> studentsWithIYR = getStudentsWithIYR(students);
-        if (studentsWithIYR.isEmpty()) {
-            System.out.println("No students with IYR components found.");
-        } else {
-            System.out.println("Students with IYR components:");
-            for (Student student : studentsWithIYR) {
-                for (Module module : student.getModules()) {
-                    for (Component component : module.getComponents()) {
-                        if (component.isComponentIYR()) {
-                            System.out.println(
-                                "Student ID: " + student.getBannerID() +
-                                ", Module CRN: " + module.getModuleCRN() +
-                                ", Component Title: " + component.getComponentTitle()
-                            );
-                        }
-                    }
-                }
-                System.out.println(student.toString());
-            }
-        }
-    }
-
-    /**
-     * Locate all IYR CSV files in the given folder.
-     */
-    public static List<File> locateIYRFiles(String baseFolderPath) {
+          
+        } 
+    public static List<File> locateIYRFiles(String baseFolderPath,String targetProgrammeCode) {
+        System.out.println("Processing IYR data within fetchStudents for path: " + baseFolderPath);
+        String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
         File folder = new File(baseFolderPath);
-        File[] files = folder.listFiles((dir, name) -> name.contains("IYR") && name.endsWith("csv"));
-        if (files != null) {
-            return Arrays.asList(files);
+        List<File> files = new ArrayList<>();
+        File[] allEntries = folder.listFiles();
+        if (allEntries != null) {
+            System.out.println("Searching for IYR files in: " + folder.getAbsolutePath());
+            for (File entry : allEntries) {
+                // Check if it's a file and the name contains "IYR" and ends with ".csv"
+                if (entry.isFile() && entry.getName().contains("IYR") && entry.getName().toLowerCase().endsWith(".csv")) {
+                    System.out.println("Found matching IYR file: " + entry.getName()); // Print the name of the matching file
+                    files.add(entry);
+                }
+            }
+            if (files.isEmpty()) {
+                 System.out.println("No files matching '*IYR*.csv' found in the directory.");
+            } else {
+                 System.out.println("Finished searching. Found " + files.size() + " IYR file(s).");
+            }
         } else {
-            return new ArrayList<>();
+             System.out.println("Warning: Could not list files in directory: " + baseFolderPath + ". It might be empty or an error occurred.");
+             // The files list will remain empty, subsequent code should handle this.
         }
+        return files; // Return the list of found files
     }
 
-    /**
-     * Update students' components based on IYR files.
-     */
-    public static List<Student> updateIYRComponents(List<Student> students, List<File> files) {
+
+public static List<Student> updateIYRComponents(List<Student> students, String logFolderPath,List<File> files) {
+    File logDir = new File(logFolderPath);
+    if (!logDir.exists()) {
+        logDir.mkdirs();
+    }
+    File logFile = new File(logDir, "IYR_updateIYRComponents_log.csv");
+
+    List<Student> IYRStudents = new ArrayList<>(); // List to hold students with IYR components
+    if (files.isEmpty()) {
+        System.out.println("No IYR files found to process.");
+        return students; // Return the original list if no files are found
+    }
+    // Define expected header names
+    final String HEADER_BANNER_ID = "Banner ID";
+    final String HEADER_CRN = "CRN";
+    final String HEADER_COMP_DESC = "Comp Desc";
+
+    List<Integer> IYR_bannerIDs = new ArrayList<>();
+
+    try (PrintWriter logWriter = new PrintWriter(new FileWriter(logFile, true))) {
         for (File file : files) {
-            try (Scanner scanner = new Scanner(file, "UTF-8")) {
-                if (scanner.hasNextLine()) scanner.nextLine(); // Skip header
-                while (scanner.hasNextLine()) {
-                    String line = scanner.nextLine();
-                    String[] fields = line.split("\\t");
-                    if (fields.length < 8) continue; // Skip if not enough fields
+            System.out.println("Processing " + file.getName());
+            DataPipeline.log(logWriter, "INFO", file.getName(), "Processing file: " + file.getPath());
 
-                    String rawID = fields[0];
-                    String crn = fields[4];
-                    String componentTitle = fields[6];
+            try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+                String line;
+                List<String> header = null;
+                int bannerIdIndex = -1, crnIndex = -1, compDescIndex = -1;
 
-                    // Remove '@' and leading zeros from Banner ID
+                while ((line = br.readLine()) != null) {
+                    if (line.trim().isEmpty() || line.contains("PG")) {
+                        DataPipeline.log(logWriter, "DEBUG", file.getName(), "Skipping line: " + line);
+                        continue;
+                    }
+
+                    String[] values = line.split(",", -1); // Include trailing empty fields
+
+                    if (header == null) {
+                        header = Arrays.asList(values);
+                        DataPipeline.log(logWriter, "INFO", file.getName(), "Header found: " + header);
+
+                        for (int i = 0; i < header.size(); i++) {
+                            String col = header.get(i).trim().replaceAll("^\"|\"$", "");
+                            if (col.equalsIgnoreCase(HEADER_BANNER_ID)) bannerIdIndex = i;
+                            else if (col.equalsIgnoreCase(HEADER_CRN)) crnIndex = i;
+                            else if (col.equalsIgnoreCase(HEADER_COMP_DESC)) compDescIndex = i;
+                        }
+
+                        if (bannerIdIndex == -1)
+                            DataPipeline.log(logWriter, "ERROR", file.getName(), "'Banner ID' column not found in header: " + header);
+                        if (crnIndex == -1)
+                            DataPipeline.log(logWriter, "WARN", file.getName(), "'CRN' column not found.");
+                        if (compDescIndex == -1)
+                            DataPipeline.log(logWriter, "WARN", file.getName(), "'Comp Desc' column not found.");
+
+                        continue; // Skip header row
+                    }
+
+                    if (values.length <= Math.max(bannerIdIndex, Math.max(crnIndex, compDescIndex))) {
+                        DataPipeline.log(logWriter, "WARN", file.getName(), "Skipping row due to insufficient columns: " + Arrays.toString(values));
+                        continue;
+                    }
+
+                    String rawID = values[bannerIdIndex].trim().replaceAll("^\"|\"$", "");
+                    String crn = crnIndex != -1 ? values[crnIndex].trim().replaceAll("^\"|\"$", "") : "";
+                    String componentTitle = compDescIndex != -1 ? values[compDescIndex].trim().replaceAll("^\"|\"$", "") : "";
+
+                    if (rawID.isEmpty()) {
+                        DataPipeline.log(logWriter, "WARN", file.getName(), "Skipping row with empty Banner ID: " + Arrays.toString(values));
+                        continue;
+                    }
+
                     String cleaned = rawID.replace("@", "").replaceFirst("^0+(?!$)", "");
-                    int bannerID = Integer.parseInt(cleaned);
+                    try {
+                        int bannerID = Integer.parseInt(cleaned);
+                        IYR_bannerIDs.add(bannerID);
+                        DataPipeline.log(logWriter, "DEBUG", file.getName(), "Parsed Banner ID: " + bannerID + " from raw ID: " + rawID);
 
-                    IYR_bannerIDs.add(bannerID);
-
-                    Student student = DataPipeline.findStudentById(students, bannerID);
-                    if (student != null) {
-                        for (Module module : student.getModules()) {
-                            if (module.getModuleCRN().equals(crn)) {
-                                for (Component component : module.getComponents()) {
-                                    if (component.getComponentTitle().equals(componentTitle)) {
-                                        component.setComponentIYR(true);
+                        Student student = DataPipeline.findStudentById(students, bannerID);
+                        if (student != null) {
+                            IYRStudents.add(student); // Add student to IYRStudents list
+                            boolean componentUpdated = false;
+                            for (Module module : student.getModules()) {
+                                if (module.getModuleCRN().equals(crn)) {
+                                    for (Component component : module.getComponents()) {
+                                        if (component.getComponentTitle().equals(componentTitle)) {
+                                            component.setComponentIYR(true);
+                                            componentUpdated = true;
+                                            DataPipeline.log(logWriter, "INFO", file.getName(), "Set IYR=true for Student " + bannerID + ", CRN " + crn + ", Component '" + componentTitle + "'");
+                                        }
                                     }
                                 }
                             }
+                            if (!componentUpdated) {
+                                DataPipeline.log(logWriter, "WARN", file.getName(), "No matching module/component found for Student " + bannerID + ", CRN " + crn + ", Component '" + componentTitle + "'");
+                            }
+                        } else {
+                            DataPipeline.log(logWriter, "WARN", file.getName(), "Student with Banner ID " + bannerID + " not found in the provided student list.");
+                        }
+                    } catch (NumberFormatException nfe) {
+                        DataPipeline.log(logWriter, "ERROR", file.getName(), "Could not parse Banner ID from cleaned string: '" + cleaned + "' (raw: '" + rawID + "'). Line: " + line);
+                    }
+                }
+            } catch (IOException e) {
+                DataPipeline.log(logWriter, "ERROR", file.getName(), "IOException while reading file: " + e.getMessage());
+            } catch (Exception e) {
+                DataPipeline.log(logWriter, "ERROR", file.getName(), "Unexpected error processing line: " + e.getMessage());
+            }
+        }
+
+        DataPipeline.log(logWriter, "INFO", "IYR_Update_Summary", "--- IYR Banner ID Check ---");
+
+        
+        if (IYR_bannerIDs.isEmpty()) {
+            DataPipeline.log(logWriter, "INFO", "IYR_Update_Summary", "No Banner IDs found in IYR files.");
+        } else {
+            Set<Integer> uniqueIYRIds = new HashSet<>(IYR_bannerIDs);
+            DataPipeline.log(logWriter, "INFO", "IYR_Update_Summary", "Total unique Banner IDs processed: " + uniqueIYRIds.size());
+            for (Integer id : uniqueIYRIds) {
+            Student iyrStudent = DataPipeline.findStudentById(students, id);
+            if (iyrStudent != null) {
+                DataPipeline.log(logWriter, "INFO", "IYR_Update_Summary", "IYR Banner ID " + id + " matched student in list.");
+            } else {
+                DataPipeline.log(logWriter, "WARN", "IYR_Update_Summary", "IYR Banner ID " + id + " not found in student list.");
+            }
+            }
+        }
+        DataPipeline.log(logWriter, "INFO", "IYR_Update_Summary", "--- End IYR Banner ID Check ---");
+
+
+    } catch (IOException e) {
+        System.err.println("FATAL: Could not write to log file: " + logFile.getPath() + " - " + e.getMessage());
+        e.printStackTrace();
+    }
+    saveIYRStudentsToFile(IYRStudents,logFolderPath, "IYR_StudentsList.csv");
+
+    return students;
+}
+public static void saveIYRStudentsToFile(List<Student> IYRStudens, String logFolderPath,String filePath) {
+    File IYRFile = new File(logFolderPath, filePath);
+    if(!IYRStudens.isEmpty()) {
+        System.out.println(IYRStudens.size() + " students with IYR components found.");
+
+ 
+        try (PrintWriter writer = new PrintWriter(new FileWriter(IYRFile))) {
+            writer.println("Student Name, Banner ID,CRN,Component Title"); // Header
+            for (Student student : IYRStudens) {
+                for (Module module : student.getModules()) {
+                    for (Component component : module.getComponents()) {
+                        if (component.isComponentIYR()) {
+                            writer.println(student.getName()+","+student.getBannerID() + "," + module.getModuleCRN() + "," + component.getComponentTitle());
                         }
                     }
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
             }
+            System.out.println("IYR students saved to " + IYRFile.getAbsolutePath());
+        } catch (IOException e) {
+            System.err.println("Error writing to file: " + e.getMessage());
+        }}
+        else {
+            System.out.println("No students with IYR components found.");
         }
-        return students;
-    }
-
+    } 
+ 
     /**
      * Get a list of students who have at least one IYR component.
      */
@@ -139,5 +246,7 @@ public class IYR {
             }
         }
         return result;
-    }
+    } 
+
+    
 }
