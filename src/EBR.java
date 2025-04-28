@@ -20,14 +20,16 @@ public class EBR {
 
     public static void main(String[] args) throws IOException {
         String baseFolderPath = "data/BMT/"; // Base folder path for Qlikview data
-        List<String> targetProgrammeCodesList = List.of("BMT.S", "BMT.F"); // Target programme codes
+        String targetProgrammeCode = "BMT";// Replace with the actual target programme codes
+        String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
+
         List<Student> students = new ArrayList<>(); // List to store all students
 
-        List<File> ModuleReports =locateEBRFiles(baseFolderPath+"EBR/", "ModuleReport",targetProgrammeCodesList.get(1));
+        List<File> ModuleReports =locateEBRFiles(baseFolderPath+"EBR/", "ModuleReport",targetProgrammeCode);
         // students = Qlikview.fetchStudents(baseFolderPath, targetProgrammeCodesList);
         // students = updateStudentsList(students, addComponentsToStudents(ModuleReports, students));
-        students = fetchStudentsMR(students, baseFolderPath, targetProgrammeCodesList);
-        students = fetchStudentsPR(students, baseFolderPath, targetProgrammeCodesList);
+        students = fetchStudentsMR(students, baseFolderPath, targetProgrammeCode);
+        students = fetchStudentsPR(students, baseFolderPath, targetProgrammeCode);
 
         for (Student student : students) {
             for(Module module: student.getModules()){
@@ -52,12 +54,15 @@ public class EBR {
         }
     
 }
-    public static List<Student> fetchStudentsMR(List<Student> students, String baseFolderPath, List<String> targetProgrammeCodesList) throws IOException {
+    public static List<Student> fetchStudentsMR(List<Student> students, String baseFolderPath, String targetProgrammeCode) throws IOException {
         
-        
-        for (String targetProgrammeCode : targetProgrammeCodesList) {
+        String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
+
+        List<String> targetProgrammeCodesList = List.of(targetProgrammeCode+".S", targetProgrammeCode+".F"); // Replace with the actual target programme codes
+
+        for (String code : targetProgrammeCodesList) {
             try {
-                students.addAll(Qlikview.fetchStudents(baseFolderPath, List.of(targetProgrammeCode)));
+                students.addAll(Qlikview.fetchStudents(baseFolderPath, code));
                 System.out.println("Found " + students.size() + " students for programme code: " + targetProgrammeCode);
             } catch (IOException e) {
                 System.err.println("An error occurred while reading Qlikview data: " + e.getMessage());
@@ -65,10 +70,10 @@ public class EBR {
             }
         }
         
-        for (String targetProgrammeCode : targetProgrammeCodesList) {
+        for (String code : targetProgrammeCodesList) {
             try {
-                List<File> files = locateEBRFiles(baseFolderPath + "/EBR", "ModuleReport",targetProgrammeCode);
-                 students = updateStudentsList(students, addComponentsToStudents(files, students));
+                List<File> files = locateEBRFiles(baseFolderPath + "/EBR","ModuleReport",code);
+                 students = updateStudentsList(students, addComponentsToStudents(files,logFolderPath, students));
             } catch (IOException e) {
                 System.err.println("An error occurred while processing EBR Module Report files: " + e.getMessage());
                 e.printStackTrace();
@@ -85,13 +90,15 @@ public class EBR {
     
         return students;
     }   
-        public static List<Student> fetchStudentsPR(List<Student> students, String baseFolderPath, List<String> targetProgrammeCodesList) throws IOException {
+        public static List<Student> fetchStudentsPR(List<Student> students, String baseFolderPath , String targetProgrammeCode) throws IOException {
 
+            String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
+        List<String> targetProgrammeCodesList = List.of(targetProgrammeCode+".S", targetProgrammeCode+".F"); // Replace with the actual target programme codes
 
-        for (String targetProgrammeCode : targetProgrammeCodesList) {
+        for (String code : targetProgrammeCodesList) {
             try {
-                List<File> files = locateEBRFiles(baseFolderPath + "/EBR", "ProgrammeReport",targetProgrammeCode);
-                students = processProgrammeReport(files, students);
+                List<File> files = locateEBRFiles(baseFolderPath + "/EBR", "ProgrammeReport",code);
+                students = processProgrammeReport(files, logFolderPath, students);
             } catch (IOException e) {
                 System.err.println("An error occurred while processing EBR Porgramme files: " + e.getMessage());
                 e.printStackTrace();
@@ -116,7 +123,7 @@ public class EBR {
     /**
      * Locates EBR files for a given programme code.
      */
-    public static List<File> locateEBRFiles(String folderPath, String reportType, String targetProgrammeCode) throws IOException {
+    public static List<File> locateEBRFiles(String folderPath,String reportType, String targetProgrammeCode) throws IOException {
         List<File> matchingFiles = new ArrayList<>();
         File folder = new File(folderPath);
         if (folder.exists() && folder.isDirectory()) {
@@ -142,9 +149,9 @@ public class EBR {
 
         return matchingFiles;
     }
-    private static List<Student> processProgrammeReport(List<File> files, List<Student> students) {
+    private static List<Student> processProgrammeReport(List<File> files,String logFolderPath, List<Student> students) {
         // Create log directory and file
-        File logDir = new File("result/log");
+        File logDir = new File(logFolderPath);
         if (!logDir.exists()) {
             logDir.mkdirs();
         }
@@ -233,7 +240,7 @@ public class EBR {
 
                         Student student = DataPipeline.findStudentById(students, bannerId);
                         if (student == null) {
-                            DataPipeline.log(logWriter, "INFO", file.getName(), "Student not found: " + bannerId);
+                            DataPipeline.log(logWriter, "INFO", file.getName(), "Student not found: " + bannerId +"in the provided qlikview student list");
                             continue;
                         }
 
@@ -298,11 +305,11 @@ public class EBR {
     }
  
 
-    public static List<Student> addComponentsToStudents(List<File> csvFiles, List<Student> students) {
+    public static List<Student> addComponentsToStudents(List<File> csvFiles,String logFolderPath, List<Student> students) {
         List<Student> updatedStudents = students; // List to store updated students
         
         // Create log directory and file
-        File logDir = new File("result/log");
+        File logDir = new File(logFolderPath);
         if (!logDir.exists()) {
             logDir.mkdirs();
         }
