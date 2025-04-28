@@ -8,30 +8,24 @@ public class SourceDoc {
 
     public static void main(String[] args) {
         String baseFolderPath = "data/BMT/";
-        List<String> targetProgrammeCodesList = List.of("BMT.S", "BMT.F"); // Replace with the actual target programme codes
+ 
+        String targetProgrammeCode = "BMT";// Replace with the actual target programme codes
+        String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
 
         List<Student> students = new ArrayList<>();
         try {
-            students = fetchStudents(students, baseFolderPath, targetProgrammeCodesList);
+            students = fetchStudents(students, baseFolderPath, targetProgrammeCode);
         } catch (IOException e) {
             System.err.println("Error fetching students: " + e.getMessage());
             return;
         }
-        // for (Student student : students) {
-        //     // Uncomment to print trailing modules or failed components
-        //     if (student.getTrailingModules() != null && !student.getTrailingModules().isEmpty()) {
-        //         System.out.println("Student: " + student.getName() + ", Trailing Modules: " + student.getTrailingModules().size());
-        //     }
-        //     if (student.getFailedComponents() != null && !student.getFailedComponents().isEmpty()) {
-        //         System.out.println("Student: " + student.getName() + ", Failed Components: " + student.getFailedComponents().size());
-        //         for (Component component : student.getFailedComponents()) {
-        //             System.out.println("Component: " + component.toString());
-        //         }
-        //     }
-        // }
+        
     }
 
-    public static List<Module> fetchSourceModules(String baseFolderPath) throws IOException {
+    public static List<Module> fetchSourceModules(String baseFolderPath, String targetProgrammeCode) throws IOException {
+
+        String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
+
         String tabNameString = "All Assessments Main Campus";
         List<File> files = locateSourceFiles(baseFolderPath + "Source/", tabNameString);
         if (files.isEmpty()) {
@@ -39,15 +33,20 @@ public class SourceDoc {
             return null;
         } else {
 
-            return readSourceDataAllAssessments(files.get(0));
+            return readSourceDataAllAssessments(files.get(0),logFolderPath);
         }
     }
 
-    public static List<Student> fetchStudents(List<Student> students, String baseFolderPath, List<String> targetProgrammeCodesList) throws IOException {
+    public static List<Student> fetchStudents(List<Student> students, String baseFolderPath, String targetProgrammeCode) throws IOException {
+        String[] parts = baseFolderPath.split("/");
+        String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
+
+        List<String> targetProgrammeCodesList = List.of(targetProgrammeCode+".S", targetProgrammeCode+".F"); // Replace with the actual target programme codes
+
         try {
             // Fetch students from Qlikview and EBR systems
-            students = Qlikview.fetchStudents(baseFolderPath, targetProgrammeCodesList);
-            students = EBR.fetchStudentsMR(students, baseFolderPath, targetProgrammeCodesList);
+            students = Qlikview.fetchStudents(baseFolderPath, targetProgrammeCode);
+            students = EBR.fetchStudentsMR(students, baseFolderPath, targetProgrammeCode);
 
             String tabNameString = "All Assessments Main Campus";
             // Locate and read module/component deadlines from the source files
@@ -57,7 +56,7 @@ public class SourceDoc {
                 return students;
             }
 
-            List<Module> modules = readSourceDataAllAssessments(files.get(0));
+            List<Module> modules = readSourceDataAllAssessments(files.get(0),logFolderPath);
 
             // For each student, update their module components with the deadline from the source data
             for (Student student : students) {
@@ -85,9 +84,10 @@ public class SourceDoc {
                     }
                 }
             }
-            verifyComponentCounts(students, modules);
-
-            System.out.println("Source Document Data processing completed.");
+            verifyComponentCounts(students, logFolderPath,modules);
+            System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
+            System.out.println("            Source Document Data processing completed.");
+            System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
             return students;
 
         } catch (IOException e) {
@@ -121,26 +121,16 @@ public class SourceDoc {
         // Filter files containing the tab name and ending with .csv
         for (File file : files) {
             if (file.isFile() && file.getName().contains(tabNameString) && file.getName().endsWith(".csv")) {
-                System.out.println("Found matching file: " + file.getAbsolutePath());
+                // System.out.println("Found matching file: " + file.getAbsolutePath());
                 matchingFiles.add(file);
             }
         }
         return matchingFiles;
-    }
+    } 
 
+    public static void verifyComponentCounts(List<Student> students, String logFolderPath, List<Module> sourceModules) {
 
-    
-
-    /**
-     * Verifies if the number of components for each module in the students list
-     * matches the number of components for the corresponding module in the source data.
-     *
-     * @param students      The list of students with their modules and components.
-     * @param sourceModules The list of modules read from the source document, used as the reference.
-     */
-    public static void verifyComponentCounts(List<Student> students, List<Module> sourceModules) {
-
-        File logDir = new File("result/log");
+        File logDir = new File(logFolderPath);
         if (!logDir.exists()) {
             logDir.mkdirs();
         }
@@ -198,7 +188,71 @@ public class SourceDoc {
                         String studentComponentsStr = formatComponentList(studentModule.getComponents());
                         String sourceComponentsStr = formatComponentList(sourceModule.getComponents());
 
-                        // Construct the detailed message for logging
+                        if (studentComponentCount < sourceComponentCount) {
+                            // Add missing components from sourceModule to studentModule
+                            for (Component sourceComponent : sourceModule.getComponents()) {
+                                boolean exists = false;
+                                if (studentModule.getComponents() != null) {
+                                    for (Component studentComponent : studentModule.getComponents()) {
+                                        if (studentComponent != null && sourceComponent.getComponentTitle() != null &&
+                                            sourceComponent.getComponentTitle().equals(studentComponent.getComponentTitle())) {
+                                            exists = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (!exists) {
+                                    // Clone the source component (shallow copy)
+                                    Component newComponent = new Component();
+                                    newComponent.setModuleCRN(sourceComponent.getModuleCRN());
+                                    newComponent.setComponentTitle(sourceComponent.getComponentTitle());
+                                    newComponent.setComponentDeadline(sourceComponent.getComponentDeadline());
+                                    newComponent.setComponentCode(sourceComponent.getComponentCode());
+                                    studentModule.getComponents().add(newComponent);
+                                }
+                            }
+                            // After updating, check if the component count matches
+                            int updatedStudentComponentCount = (studentModule.getComponents() != null) ? studentModule.getComponents().size() : 0;
+                            if (updatedStudentComponentCount == sourceComponentCount) {
+                                String updateSuccessMessage = String.format(
+                                    "Updated student module components successfully for Student: %s (%d), Module CRN: %s. Updated Count: %d, Source Count: %d. Student Components: [%s], Source Components: [%s]",
+                                    studentName,
+                                    bannerId,
+                                    moduleCrn,
+                                    updatedStudentComponentCount,
+                                    sourceComponentCount,
+                                    formatComponentList(studentModule.getComponents()),
+                                    sourceComponentsStr
+                                );
+                                DataPipeline.log(logWriter, "INFO", "verifyComponentCounts", updateSuccessMessage);
+                            } else {
+                                String updateFailMessage = String.format(
+                                    "Failed to update student module components to match source for Student: %s (%d), Module CRN: %s. Updated Count: %d, Source Count: %d. Student Components: [%s], Source Components: [%s]",
+                                    studentName,
+                                    bannerId,
+                                    moduleCrn,
+                                    updatedStudentComponentCount,
+                                    sourceComponentCount,
+                                    formatComponentList(studentModule.getComponents()),
+                                    sourceComponentsStr
+                                );
+                                DataPipeline.log(logWriter, "ERROR", "verifyComponentCounts", updateFailMessage);
+                            }
+                        } else {
+                            String duplicateMessage = String.format(
+                                "Potentially one component added multiple times for this student, please check. Student: %s (%d), Module CRN: %s. Student Count: %d, Source Count: %d. Student Components: [%s], Source Components: [%s]",
+                                studentName,
+                                bannerId,
+                                moduleCrn,
+                                studentComponentCount,
+                                sourceComponentCount,
+                                studentComponentsStr,
+                                sourceComponentsStr
+                            );
+                            DataPipeline.log(logWriter, "ERROR", "verifyComponentCounts", duplicateMessage);
+                        }
+
+                        // Log the mismatch details using the log function
                         String mismatchMessage = String.format(
                             "Component count mismatch for Student: %s (%d), Module CRN: %s. Student Count: %d, Source Count: %d. Student Components: [%s], Source Components: [%s]",
                             studentName,
@@ -209,7 +263,6 @@ public class SourceDoc {
                             studentComponentsStr,
                             sourceComponentsStr
                         );
-                        // Log the mismatch details using the log function
                         DataPipeline.log(logWriter, "ERROR", "verifyComponentCounts", mismatchMessage);
 
                         // Log a simpler version indicating mismatch found and logged
@@ -221,7 +274,7 @@ public class SourceDoc {
                             studentComponentCount,
                             sourceComponentCount
                         );
-                         DataPipeline.log(logWriter, "ERROR", "verifyComponentCounts", summaryMessage);
+                        DataPipeline.log(logWriter, "ERROR", "verifyComponentCounts", summaryMessage);
                     } else {
                          String matchMessage = String.format(
                             "Component count matches for Student: %s (%d), Module CRN: %s. Count: %d",
@@ -253,15 +306,8 @@ public class SourceDoc {
                 e.printStackTrace();
             }
         }
-    }
+    } 
 
-    /**
-     * Helper method to format a list of components into a single string for CSV.
-     * Handles null components and potential commas/quotes in titles.
-     *
-     * @param components List of Component objects.
-     * @return A string representation of component titles, separated by '|'.
-     */
     private static String formatComponentList(List<Component> components) {
         if (components == null || components.isEmpty()) {
             return "(No components)";
@@ -284,9 +330,9 @@ public class SourceDoc {
         return sb.toString();
     }
  
-        public static List<Module> readSourceDataAllAssessments(File file) throws IOException {
+        public static List<Module> readSourceDataAllAssessments(File file,String logFolderPath) throws IOException {
             List<Module> modulesList = new ArrayList<>();
-            File logDir = new File("result/log");
+            File logDir = new File(logFolderPath);
             if (!logDir.exists()) {
             logDir.mkdirs();
             }
