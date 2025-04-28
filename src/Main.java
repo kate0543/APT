@@ -1,87 +1,10 @@
-/*
- * Main class for processing student, module, and attendance data.
- * (Implementation removed as requested.)
- *
- * TODO List:
- *
- * Data Acquisition & Access:
- *   - [ ] QlikView:
- *     - [ ] Access Student by Programme with Registration Status (Filter: UG, Main Campus, Reg Status != Withdrawn~)
- *     - [ ] Access Component Due Dates By Block
- *     - [ ] Access Student on Module by Registration Status
- *     - [ ] Download current year cohort registration status.
- *     - [ ] Download last 4 academic years EBR data for L4/5/6 (check CRN linkage).
- *   - [ ] Step (Jisc):
- *     - [ ] Clarify data structure with Chris (student-based vs. module-based).
- *     - [ ] Obtain engagement & attendance data.
- *     - [ ] Download last year JISC attendance T1 and T2 files.
- *     - [ ] Download current year T1 JISC file.
- *   - [ ] Blackboard:
- *     - [ ] Obtain admin access.
- *     - [ ] Access submission time data (module-based).
- *   - [ ] Gradebook:
- *     - [ ] Get access for pass/fail checks.
- *   - [ ] Exam Board Reporter (EBR):
- *     - [ ] Request access (AC TRAINING).
- *     - [ ] Download reports based on CRN (from QlikView).
- *     - [ ] Understand report views (Admin/Panel/History).
- *   - [ ] Source Document:
- *     - [ ] Use for component DDL & IYR Date Assessments Tabs.
- *     - [ ] Get LEAF module list for Law cohorts.
- *   - [ ] IYR List:
- *     - [ ] Obtain IYR list for entire SBS.
- *   - [ ] Verify Level 3 data sources.
- *
- * Data Integration & Processing:
- *   - [ ] Integrate Blackboard submission data to be student-based (using network ID).
- *   - [ ] Integrate Jisc data if module-based.
- *   - [ ] Link data across sources (QlikView CRN, Network ID, etc.).
- *   - [ ] Process QlikView data to identify:
- *     - [ ] Student Level
- *     - [ ] Submission dates
- *     - [ ] Last year progression (Resit status: RP/RE)
- *     - [ ] Modules per student
- *   - [ ] Process Jisc data for:
- *     - [ ] Attendance %
- *     - [ ] Engagement %
- *     - [ ] Last year Attendance & Engagement %
- *   - [ ] Process Blackboard data for:
- *     - [ ] Non-submission/late submission flags.
- *   - [ ] Process Gradebook data for pass/fail status.
- *   - [ ] Process EBR data for resit outcomes (** marker).
- *   - [ ] Handle PMC/RAP cases (check data, potentially exclude initially).
- *
- * Priority Group Identification (Initialize yearly, update per trimester/trigger):
- *   - [ ] Identify Level 3 & 4 students (Target: 2 meetings/trimester).
- *   - [ ] Identify students trailing a module (QlikView: additional retake module).
- *   - [ ] Identify students repeating the year with attendance (QlikView: Reg Status=RP).
- *   - [ ] Identify students who engaged in IYR last year (Submission date between DDL & resit + passed). (Note: No IYR for L3 now).
- *   - [ ] Identify students who progressed through resit period (Submission date after IYR + passed).
- *   - [ ] Identify students with < 70% engagement last year/trimester (Jisc).
- *   - [ ] Identify students engaging in IYR in the current year (L4 only, post-DDL).
- *   - [ ] Identify T2 students carrying a fail from T1 (For T2 start only).
- *   - [ ] Update priority group based on PMC status (P, R, RR).
- *
- * Implementation & Verification:
- *   - [ ] Start implementation with Law Programme data.
- *   - [ ] Follow with Business Management (BM) cohort.
- *   - [ ] Verify priority group logic and results with C.
- *   - [ ] Ensure all required data is shared via Teams channel.
- *
- * Future Work:
- *   - [ ] Incorporate PMC/RAP data analysis.
- *
- */
 package src;
 
 import javax.swing.*;
-import javax.xml.crypto.Data;
-
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -91,17 +14,22 @@ public class Main {
     private static JFileChooser folderChooser;
     private static JTextField programmeField;
     private static JComboBox<String> reasonCombo;
+    private static JTextField attendanceRateField;
     private static JButton generateBtn;
+    private static JButton exportBtn;
 
     private static File rootFolder;
-    private static String priorityString="";
-     private static String targetProgrammeCode="";
-     private static List<String> targetProgrammeCodesList = new ArrayList<>(); // Example list, replace with actual data
- 
-     // Made static to be accessed from static main method and lambdas
-     static List<Student> students = new  ArrayList<>();
-     static List<Student> priorityStudents = new  ArrayList<>(); // Example list, replace with actual data
-     static String choosenCiteria = ""; // Example criteria, replace with actual data
+    private static String priorityString = "";
+    private static String targetProgrammeCode = "";
+    private static List<String> targetProgrammeCodesList = new ArrayList<>(); 
+    
+    // Default attendance threshold
+    private static int default_attendance_threshold = 30;
+
+    // Made static to be accessed from static main method and lambdas
+    static List<Student> students = new ArrayList<>();
+    static List<Student> priorityStudents = new ArrayList<>(); 
+    static String choosenCiteria = ""; 
 
     public enum PriorityCriteriaList {
         ALL_REASONS("All Reasons"),
@@ -109,7 +37,6 @@ public class Main {
         NEW_REGISTRATION("New Registration"),
         TRAILING_STUDENTS("Trailing Students"),
         FAIL_STUDENTS("Fail Students"),
-
         PROGRAMMEREGSTATUSNOTRE("Programme Reg Status Not RE"),
         MODULEENROLLMENTNOTRE("Module Enrollment Not RE");
 
@@ -121,200 +48,474 @@ public class Main {
 
         @Override
         public String toString() {
-
-
-
             return displayName;
         }
     }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            frame = new JFrame("Student Priority Group Tool");
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setSize(700, 500);
-            frame.setLayout(new BorderLayout());
+            setupUI();
+        });
+    }
+    
+    private static void setupUI() {
+        frame = new JFrame("Student Priority Group Tool");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(700, 500);
+        frame.setLayout(new BorderLayout());
 
-            JPanel topPanel = new JPanel(new GridBagLayout());
-            GridBagConstraints gbc = new GridBagConstraints();
-            gbc.insets = new Insets(5, 5, 5, 5); // padding between components
-            gbc.anchor = GridBagConstraints.WEST;
+        JPanel topPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5); // padding between components
+        gbc.anchor = GridBagConstraints.WEST;
 
-            // Components
-            JButton chooseRootBtn = new JButton("Choose Root Folder");
-            programmeField = new JTextField(12);
-            programmeField.setToolTipText("Enter Programme Code");
+        // Components
+        JButton chooseRootBtn = new JButton("Choose Root Folder");
+        programmeField = new JTextField(12);
+        programmeField.setToolTipText("Enter Programme Code");
 
-            reasonCombo = new JComboBox<>();
-            reasonCombo.addItem("Select Priority Reason...");
-            for (PriorityCriteriaList criteria : PriorityCriteriaList.values()) {
-                reasonCombo.addItem(criteria.toString());
+        setupReasonCombo();
+        setupAttendanceField();
+
+        JButton loadDataBtn = new JButton("Load Data");
+        generateBtn = new JButton("Generate Priority Group");
+        generateBtn.setEnabled(true);
+        
+        // Create Export Button
+        exportBtn = new JButton("Export to CSV");
+        exportBtn.setEnabled(false); // Initially disabled
+        
+        // Add Reset Button
+        JButton resetBtn = new JButton("Reset");
+
+        // Add components to panel
+        addComponentsToPanel(topPanel, gbc, chooseRootBtn, loadDataBtn, generateBtn, resetBtn);
+
+        // Log area
+        logArea = new JTextArea();
+        logArea.setEditable(false);
+        JScrollPane scrollPane = new JScrollPane(logArea);
+
+        // Frame Layout
+        frame.add(topPanel, BorderLayout.NORTH);
+        frame.add(scrollPane, BorderLayout.CENTER);
+
+        folderChooser = new JFileChooser();
+        folderChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+
+        // Setup action listeners
+        setupActionListeners(chooseRootBtn, loadDataBtn, generateBtn, exportBtn, resetBtn);
+
+        frame.setVisible(true);
+    }
+    
+    private static void setupReasonCombo() {
+        reasonCombo = new JComboBox<>();
+        reasonCombo.addItem("Select Priority Reason...");
+        for (PriorityCriteriaList criteria : PriorityCriteriaList.values()) {
+            reasonCombo.addItem(criteria.toString());
+        }
+        
+        reasonCombo.addActionListener(e -> {
+            Object selectedItem = reasonCombo.getSelectedItem();
+            if (selectedItem != null && !selectedItem.toString().equals("Select Priority Reason...")) {
+                choosenCiteria = selectedItem.toString();
+            } else {
+                choosenCiteria = ""; // Reset if default is selected
             }
-            // Add ActionListener to update cchoosenCiteria when selection changes
-            reasonCombo.addActionListener(e -> {
-                Object selectedItem = reasonCombo.getSelectedItem();
-                if (selectedItem != null && !selectedItem.toString().equals("Select Priority Reason...")) {
-                    choosenCiteria = selectedItem.toString();
-                    // Optional: Log the change for debugging
-                    // logArea.append("Selected criteria: " + cchoosenCiteria + "\n");
-                } else {
-                    choosenCiteria = ""; // Reset if default is selected
-                }
-            });
+        });
+    }
+    
+    private static void setupAttendanceField() {
+        attendanceRateField = new JTextField(5);
+        attendanceRateField.setText(String.valueOf(default_attendance_threshold));
+        attendanceRateField.setToolTipText("Enter Attendance Rate Threshold (%)");
 
-            JButton loadDataBtn = new JButton("Load Data");
-            generateBtn = new JButton("Generate Priority Group");
-            generateBtn.setEnabled(true);
-
-            // Row 0: Choose Root Folder Button
-            gbc.gridx = 0;
-            gbc.gridy = 0;
-            topPanel.add(chooseRootBtn, gbc);
-
-            // Row 1: Programme Label + TextField
-            gbc.gridx = 0;
-            gbc.gridy = 1;
-            topPanel.add(new JLabel("Programme:"), gbc);
-
-            gbc.gridx = 1;
-            topPanel.add(programmeField, gbc);
-
-            // Row 2: Reason Label + ComboBox
-            gbc.gridx = 0;
-            gbc.gridy = 2;
-            topPanel.add(new JLabel("Reason:"), gbc);
-
-            gbc.gridx = 1;
-            topPanel.add(reasonCombo, gbc);
-
-            // Row 3: Load Data and Generate Buttons
-            gbc.gridx = 0;
-            gbc.gridy = 3;
-            topPanel.add(loadDataBtn, gbc);
-
-            gbc.gridx = 1;
-            topPanel.add(generateBtn, gbc);
-
-            // Log area
-            logArea = new JTextArea();
-            logArea.setEditable(false);
-            JScrollPane scrollPane = new JScrollPane(logArea);
-
-            // Frame Layout
-            frame.add(topPanel, BorderLayout.NORTH);
-            frame.add(scrollPane, BorderLayout.CENTER);
-
-            folderChooser = new JFileChooser();
-            folderChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-
-            // Actions
-            chooseRootBtn.addActionListener(e -> {
-                int result = folderChooser.showOpenDialog(frame);
-                if (result == JFileChooser.APPROVE_OPTION) {
-                    rootFolder = folderChooser.getSelectedFile();
-                    logArea.append("Root folder set to: " + rootFolder.getAbsolutePath() + "\n");
-                    chooseRootBtn.setEnabled(false);
-                }
-            });
-
-            loadDataBtn.addActionListener(e -> {
-                if (rootFolder == null) {
-                    JOptionPane.showMessageDialog(frame, "Please choose a root folder first.");
-                    return;
-                }
-                logArea.append("Loading data from: " + rootFolder.getAbsolutePath() + "\n");
-                // Example usage: fetch students for the entered programme code
-                String programme = programmeField.getText().trim();
-                if (programme.isEmpty()) {
-                    JOptionPane.showMessageDialog(frame, "Please enter a programme code.");
-                    return;
-                } else {
-                    targetProgrammeCodesList = List.of(programme + ".S", programme + ".F"); // Example: replace with actual list of programme codes
-                    try {
-                        // Dummy students list, replace with actual data as needed
-                        // Assuming StEP.fetchStudents returns the updated list and handles potential IOExceptions
-                        Path baseFolderPath = rootFolder.toPath().resolve(programme);
-                        students = StEP.fetchStudents(students, baseFolderPath.toString()+"/", targetProgrammeCode);
-                        logArea.append("Fetched " + students.size() + " students for programme: " + programme + "\n");
-                    } catch (IOException ex) {
-                        logArea.append("Error loading students: " + ex.getMessage() + "\n");
+        attendanceRateField.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusLost(FocusEvent e) {
+                updateAttendanceThreshold();
+                // If threshold is set (not empty and not default), restrict criteria
+                String rateText = attendanceRateField.getText().trim();
+                boolean thresholdEntered = !rateText.isEmpty() && !rateText.equals("0");
+                reasonCombo.removeAllItems();
+                // if (thresholdEntered) {
+                //     reasonCombo.addItem("Select Priority Reason...");
+                //     reasonCombo.addItem(PriorityCriteriaList.ALL_REASONS.toString());
+                //     reasonCombo.addItem(PriorityCriteriaList.LOW_ATTENDANCE.toString());
+                // } else {
+                    reasonCombo.addItem("Select Priority Reason...");
+                    for (PriorityCriteriaList criteria : PriorityCriteriaList.values()) {
+                        reasonCombo.addItem(criteria.toString());
                     }
-                }
-            });
+                // }
+                choosenCiteria = "";
+            }
+        });
+    }
+    
+    private static void addComponentsToPanel(JPanel topPanel, GridBagConstraints gbc, 
+                                        JButton chooseRootBtn, JButton loadDataBtn, 
+                                        JButton generateBtn, JButton resetBtn) {
+        // Set up panel with some padding and spacing
+        topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        // File Selection Section
+        JPanel filePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        filePanel.add(chooseRootBtn);
+        
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.gridwidth = 4;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        topPanel.add(filePanel, gbc);
+        
+        // Add separator
+        gbc.gridy = 1;
+        gbc.insets = new Insets(5, 5, 5, 5);
+        topPanel.add(new JSeparator(), gbc);
+        
+        // Parameters Section
+        JPanel paramsPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints paramGbc = new GridBagConstraints();
+        paramGbc.insets = new Insets(2, 5, 2, 5);
+        paramGbc.anchor = GridBagConstraints.WEST;
+        
+        // Programme row
+        paramGbc.gridx = 0;
+        paramGbc.gridy = 0;
+        paramsPanel.add(new JLabel("Programme:"), paramGbc);
+        
+        paramGbc.gridx = 1;
+        paramGbc.weightx = 1.0;
+        paramGbc.fill = GridBagConstraints.HORIZONTAL;
+        paramsPanel.add(programmeField, paramGbc);
+        
+        // Reason row
+        paramGbc.gridx = 0;
+        paramGbc.gridy = 1;
+        paramGbc.weightx = 0;
+        paramGbc.fill = GridBagConstraints.NONE;
+        paramsPanel.add(new JLabel("Reason:"), paramGbc);
+        
+        paramGbc.gridx = 1;
+        paramGbc.weightx = 1.0;
+        paramGbc.fill = GridBagConstraints.HORIZONTAL;
+        paramsPanel.add(reasonCombo, paramGbc);
+        
+        // Attendance threshold row
+        paramGbc.gridx = 0;
+        paramGbc.gridy = 2;
+        paramGbc.weightx = 0;
+        paramGbc.fill = GridBagConstraints.NONE;
+        paramsPanel.add(new JLabel("Attendance Threshold (%):"), paramGbc);
+        
+        paramGbc.gridx = 1;
+        paramGbc.fill = GridBagConstraints.NONE;
+        paramGbc.anchor = GridBagConstraints.WEST;
+        paramsPanel.add(attendanceRateField, paramGbc);
+        
+        // Add parameters panel to main panel
+        gbc.gridy = 2;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        topPanel.add(paramsPanel, gbc);
+        
+        // Add separator
+        gbc.gridy = 3;
+        topPanel.add(new JSeparator(), gbc);
+        
+        // Action Buttons Section
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
+        buttonPanel.add(loadDataBtn);
+        buttonPanel.add(generateBtn);
+        buttonPanel.add(exportBtn);
+        buttonPanel.add(resetBtn);
+        
+        gbc.gridy = 4;
+        gbc.insets = new Insets(5, 5, 10, 5);
+        topPanel.add(buttonPanel, gbc);
+    }
+    
+    private static void setupActionListeners(JButton chooseRootBtn, JButton loadDataBtn, 
+                                          JButton generateBtn, JButton exportBtn, JButton resetBtn) {
+        // Choose Root Button Action
+        chooseRootBtn.addActionListener(e -> handleChooseRoot(chooseRootBtn));
+        
+        // Load Data Button Action
+        loadDataBtn.addActionListener(e -> handleLoadData());
 
-            generateBtn.addActionListener(e -> {
-                String programme = programmeField.getText().trim();
-                String reason = (String) reasonCombo.getSelectedItem();
+        // Generate Button Action
+        generateBtn.addActionListener(e -> handleGeneratePriorityGroup());
 
-                if (programme.isEmpty() || reason == null || reason.equals("Select Priority Reason...")) {
-                    JOptionPane.showMessageDialog(frame, "Please enter a programme and select a valid reason.");
-                    return;
+        // Export Button Action
+        exportBtn.addActionListener(e -> handleExportToCsv());
+
+        // Reset Button Action
+        resetBtn.addActionListener(e -> handleReset(chooseRootBtn));
+    }
+    
+    private static void handleChooseRoot(JButton chooseRootBtn) {
+        int result = folderChooser.showOpenDialog(frame);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            rootFolder = folderChooser.getSelectedFile();
+            logArea.append("Root folder set to: " + rootFolder.getAbsolutePath() + "\n");
+            chooseRootBtn.setEnabled(false);
+        }
+    }
+    
+    private static void handleLoadData() {
+        if (rootFolder == null) {
+            showWrappedMessageDialog("Please choose a root folder first.");
+            return;
+        }
+        
+        String programme = programmeField.getText().trim();
+        if (programme.isEmpty()) {
+            showWrappedMessageDialog("Please enter a programme code.");
+            return;
+        }
+        
+        logArea.append("Loading data from: " + rootFolder.getAbsolutePath() + "\n");
+        
+        try {
+            // Update targetProgrammeCode from the input field
+            targetProgrammeCode = programme;
+            
+            // Generate programme codes list (with S and F suffixes)
+            targetProgrammeCodesList = List.of(programme + ".S", programme + ".F");
+            
+            // Resolve path for program data
+            Path baseFolderPath = rootFolder.toPath().resolve(programme);
+            
+            // Load students from data path
+            students = StEP.fetchStudents(students, baseFolderPath.toString() + "/", targetProgrammeCode);
+            logArea.append("Fetched " + students.size() + " students for programme: " + programme + "\n");
+            
+            // Enable generate button if students were loaded
+            if (!students.isEmpty()) {
+                generateBtn.setEnabled(true);
+            }
+        } catch (IOException ex) {
+            logArea.append("Error loading students: " + ex.getMessage() + "\n");
+            showWrappedMessageDialog("Error loading data: " + ex.getMessage(), 
+                                  "Data Loading Error", JOptionPane.ERROR_MESSAGE);
+        } catch (Exception ex) {
+            logArea.append("Unexpected error: " + ex.getMessage() + "\n");
+            showWrappedMessageDialog("Unexpected error: " + ex.getMessage(), 
+                                   "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private static void handleGeneratePriorityGroup() {
+        // Ensure data has been loaded
+        if (students == null || students.isEmpty()) {
+            showWrappedMessageDialog("Please load data first using the 'Load Data' button.");
+            return;
+        }
+
+        // Get programme from field
+        String programme = programmeField.getText().trim();
+        
+        // Validate attendance threshold
+        if (!updateAttendanceThreshold()) {
+            return;
+        }
+
+        // Validate criteria selection
+        if (choosenCiteria == null || choosenCiteria.isEmpty() || 
+            choosenCiteria.equals("Select Priority Reason...")) {
+            showWrappedMessageDialog("Please select a valid priority reason.");
+            return;
+        }
+
+        try {
+            // Log generation parameters
+            logArea.append("--- Generating Priority Group ---\n");
+            logArea.append("Programme: " + (programme.isEmpty() ? "Not specified" : programme) + "\n");
+            logArea.append("Selected Reason: " + choosenCiteria + "\n");
+            logArea.append("Attendance Threshold: " + default_attendance_threshold + "%\n");
+            logArea.append("Using loaded student data (" + students.size() + " students).\n");
+
+            // Create data pipeline and set threshold
+            DataPipeline dataPipeline = new DataPipeline();
+            dataPipeline.threshold = default_attendance_threshold;
+            
+            // Get priority students
+            priorityStudents = dataPipeline.fetchPriorityStudents(students, targetProgrammeCode, choosenCiteria);
+
+            // Handle results
+            if (priorityStudents == null || priorityStudents.isEmpty()) {
+                logArea.append("No priority students found for the selected criteria: " + choosenCiteria + "\n");
+                exportBtn.setEnabled(false);
+            } else {
+                logArea.append("Found " + priorityStudents.size() + " priority students for criteria: " + choosenCiteria + "\n");
+                
+                // Display each student
+                for (Student student : priorityStudents) {
+                    logArea.append("  - " + student.toString() + "\n");
                 }
-                else{
-                    priorityStudents= DataPipeline.fetchPriorityStudents(students, targetProgrammeCode,choosenCiteria);
-                }
-                        // Check if the list is empty or null
+                
+                // Enable export
+                exportBtn.setEnabled(true);
+            }
+
+            logArea.append("--- Generation Complete ---\n\n");
+            
+        } catch (Exception ex) {
+            logArea.append("Error generating priority group: " + ex.getMessage() + "\n");
+            showWrappedMessageDialog("Error generating priority group: " + ex.getMessage(),
+                                  "Generation Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private static void handleExportToCsv() {
         if (priorityStudents == null || priorityStudents.isEmpty()) {
-            logArea.append("No priority students found for the selected criteria.\n");
-        } else {
-            logArea.append("Priority Students:\n");
-            // Iterate and display each student's name and ID
-            for (Student student : priorityStudents) {
-                // Assuming Student class has methods like getName() and getStudentId()
-                // Adjust method names if they differ in your Student class definition
-                logArea.append("  - Name: " + student.getName() + ", ID: " + student.getBannerID() + "\n");
+            showWrappedMessageDialog("No priority students data available to export.");
+            return;
+        }
 
-                logArea.append("Generating priority group for Programme: " + programme + ", Reason: " + reason + "\n");
+        JFileChooser fileSaver = new JFileChooser();
+        fileSaver.setDialogTitle("Save Priority Students CSV");
+        
+        // Create suggested filename
+        String sanitizedCriteria = choosenCiteria.replace(" ", "_").replace("/", "_");
+        String suggestedFilename = "priority_students_" + sanitizedCriteria + ".csv";
+        fileSaver.setSelectedFile(new File(suggestedFilename));
+        
+        fileSaver.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("CSV Files", "csv"));
 
+        int userSelection = fileSaver.showSaveDialog(frame);
+
+        if (userSelection == JFileChooser.APPROVE_OPTION) {
+            File fileToSave = fileSaver.getSelectedFile();
+            
+            // Ensure CSV extension
+            if (!fileToSave.getName().toLowerCase().endsWith(".csv")) {
+                fileToSave = new File(fileToSave.getParentFile(), fileToSave.getName() + ".csv");
+            }
+
+            logArea.append("Exporting priority students to: " + fileToSave.getAbsolutePath() + "\n");
+
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileToSave))) {
+                // Write CSV Header with better field names
+                writer.write("StudentInfo ,Criteria,Attendance Threshold");
+                writer.newLine();
+
+                // Write student data
+                for (Student student : priorityStudents) {
+                    // Using a more robust CSV formatting approach
+                    // This assumes Student.toString() returns something like "Smith, John (12345)"
+                    String studentInfo = " ["+csvEscape(student.toString())+"]";
+                    String line = studentInfo + "," + 
+                                 csvEscape(choosenCiteria) + "," + 
+                                 default_attendance_threshold;
+                    writer.write(line);
+                    writer.newLine();
+                }
+                
+                logArea.append("Export successful.\n");
+                showWrappedMessageDialog("Priority students exported successfully to:\n" + 
+                                      fileToSave.getAbsolutePath());
+
+            } catch (IOException ex) {
+                logArea.append("Error exporting to CSV: " + ex.getMessage() + "\n");
+                showWrappedMessageDialog("Error exporting file: " + ex.getMessage(), 
+                                      "Export Error", JOptionPane.ERROR_MESSAGE);
             }
         }
-                
-                // FIXME: The method calculatePriorityGroup(Student, String) in the type DataPipeline
-                // is not applicable for the arguments (List<Student>, String).
-                // You might need to iterate through the students list or change the DataPipeline method.
-                // Example of iteration (if needed):
-                // for (Student student : students) {
-                //     DataPipeline.calculatePriorityGroup(student, reason);
-                // }
-                // Or adjust the DataPipeline method signature.
-                // DataPipeline.calculatePriorityGroup(students, reason); // Keep commented out or implement fix
+    }
+    
+    private static String csvEscape(String value) {
+        if (value == null) {
+            return "";
+        }
+        
+        // If value contains comma, quote, or newline, wrap in quotes and escape quotes
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
+    }
+    
+    private static void handleReset(JButton chooseRootBtn) {
+        // Reset UI components
+        rootFolder = null;
+        programmeField.setText("");
+        reasonCombo.setSelectedIndex(0);
+        attendanceRateField.setText(String.valueOf(default_attendance_threshold));
+        logArea.setText("");
+        chooseRootBtn.setEnabled(true);
+        generateBtn.setEnabled(true);
+        exportBtn.setEnabled(false);
 
-                logArea.append("Skipping priority group calculation due to method signature mismatch or pending implementation.\n");
+        // Clear data structures
+        students.clear();
+        priorityStudents.clear();
+        targetProgrammeCodesList.clear();
+        targetProgrammeCode = "";
+        choosenCiteria = "";
 
-                // TODO: Implement actual priority group generation logic based on 'students' list and 'reason'
-                logArea.append("Priority group generation process initiated (actual logic pending).\n");
-                // Example: List<Student> priorityGroup = DataPipeline.generateGroup(students, reason);
-                // logArea.append("Generated priority group with " + priorityGroup.size() + " students.\n");
-                logArea.append("Priority group generated (dummy output).\n");
-                
-            });
-
-            // Add Reset Button
-            JButton resetBtn = new JButton("Reset");
-            gbc.gridx = 2; // Place it next to Generate button
-            gbc.gridy = 3;
-            topPanel.add(resetBtn, gbc);
-
-            resetBtn.addActionListener(e -> {
-                // Reset UI components
-                rootFolder = null;
-                programmeField.setText("");
-                reasonCombo.setSelectedIndex(0); // Reset to "Select Priority Reason..."
-                logArea.setText(""); // Clear log area
-                chooseRootBtn.setEnabled(true); // Re-enable root folder selection
-                generateBtn.setEnabled(true); // Keep enabled or disable based on logic
-
-                // Clear data structures
-                students.clear();
-                priorityStudents.clear();
-                targetProgrammeCodesList.clear();
-                targetProgrammeCode = "";
-                choosenCiteria = "";
-
-                logArea.append("Application reset.\n");
-            });
-
-            frame.setVisible(true);
-        });
+        logArea.append("Application reset.\n");
+    }
+    
+    // Method to validate and update the default attendance threshold
+    private static boolean updateAttendanceThreshold() {
+        String rateText = attendanceRateField.getText().trim();
+        
+        // If field is empty, set back to default
+        if (rateText.isEmpty()) {
+            attendanceRateField.setText(String.valueOf(default_attendance_threshold));
+            return true;
+        }
+        
+        try {
+            int newThreshold = Integer.parseInt(rateText);
+            
+            // Validate range (0-100%)
+            if (newThreshold < 0 || newThreshold > 100) {
+                showWrappedMessageDialog("Attendance threshold must be between 0 and 100.", 
+                    "Invalid Input", 
+                    JOptionPane.ERROR_MESSAGE);
+                attendanceRateField.requestFocus();
+                return false;
+            }
+            
+            // Update the default threshold
+            default_attendance_threshold = newThreshold;
+            return true;
+        } catch (NumberFormatException ex) {
+            showWrappedMessageDialog("Please enter a valid integer for attendance threshold.",
+                "Invalid Input", 
+                JOptionPane.ERROR_MESSAGE);
+            attendanceRateField.requestFocus();
+            return false;
+        }
+    }
+    
+    // Helper method to show wrapped text in JOptionPane
+    private static void showWrappedMessageDialog(String message) {
+        showWrappedMessageDialog(message, "Message", JOptionPane.INFORMATION_MESSAGE);
+    }
+    
+    // Helper method to show wrapped text in JOptionPane with custom title and message type
+    private static void showWrappedMessageDialog(String message, String title, int messageType) {
+        JTextArea textArea = new JTextArea(message);
+        textArea.setEditable(false);
+        textArea.setWrapStyleWord(true);  // Wrap at word boundaries
+        textArea.setLineWrap(true);       // Enable line wrapping
+        textArea.setBackground(UIManager.getColor("Label.background"));
+        textArea.setFont(UIManager.getFont("Label.font"));
+        textArea.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        
+        // Create a panel that will contain the text area
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.add(textArea, BorderLayout.CENTER);
+        
+        // Set a reasonable maximum width (you can adjust this)
+        int maxWidth = 600;  // pixels
+        panel.setPreferredSize(new Dimension(maxWidth, textArea.getPreferredSize().height));
+        
+        // Show the dialog - the text will wrap automatically within the panel's width
+        JOptionPane.showMessageDialog(frame, panel, title, messageType);
     }
 }
