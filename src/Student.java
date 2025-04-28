@@ -135,6 +135,9 @@ public class Student {
     }
 
     public Integer getStudentLastTermAttendanceRate() {
+        if (studentLastTermAttendanceRate == null) {
+            calculateLastTermAttendance(); // Ensure the attendance rate is calculated before returning
+        }
         return studentLastTermAttendanceRate;
     }
 
@@ -156,6 +159,9 @@ public class Student {
     }
 
     public Integer getStudentLastYearAttendanceRate() {
+        if (studentLastYearAttendanceRate == null) {
+            calculateStudentLastYearAttendanceRate(); // Ensure the attendance rate is calculated before returning
+        }
         return studentLastYearAttendanceRate;
     }
 
