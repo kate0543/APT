@@ -8,16 +8,19 @@ import java.util.*;
 public class Qlikview {
     public static void main(String[] args) {
         String baseFolderPath = "data/BMT/"; // Replace with the actual base folder path
-        List<String> targetProgrammeCodesList = List.of("BMT.S", "BMT.F"); // Replace with the actual target programme codes
+        // Split by "/" and get the subfolder name (last non-empty part)
+  ;
+        String targetProgrammeCode = "BMT";// Replace with the actual target programme codes
+        String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
         List<Student> students = new ArrayList<>(); // List to store all students
 
         try {
-            students = fetchStudents(baseFolderPath, targetProgrammeCodesList);
+            students = fetchStudents(baseFolderPath, targetProgrammeCode);
 
             if (!students.isEmpty()) {
                 for (Student student : students) {
                     // Uncomment to print students with trailing modules
-                    System.out.println(student.toString());
+                    // System.out.println(student.toString());
                 }
             } else {
                 System.out.println("No students found for the specified programme codes.");
@@ -29,12 +32,13 @@ public class Qlikview {
  
     }
 
-    public static List<Student> fetchStudents(String baseFolderPath, List<String> targetProgrammeCodesList) throws IOException {
+    public static List<Student> fetchStudents(String baseFolderPath, String targetProgrammeCode) throws IOException {
         List<Student> students = new ArrayList<>();
-
-        for (String targetProgrammeCode : targetProgrammeCodesList) {
+        String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
+        List<String> targetProgrammeCodesList = List.of(targetProgrammeCode+".S", targetProgrammeCode+".F"); // Replace with the actual target programme codes
+        for (String code : targetProgrammeCodesList) {
             try {
-                students.addAll(locateQlikviewFiles(baseFolderPath + "/Qlikview/", targetProgrammeCode));
+                students.addAll(locateQlikviewFiles(baseFolderPath + "/Qlikview/", logFolderPath,code));
                 // System.out.println("Found " + students.size() + " students for programme code: " + targetProgrammeCode);
             } catch (IOException e) {
                 System.err.println("An error occurred while reading Qlikview data: " + e.getMessage());
@@ -47,7 +51,7 @@ public class Qlikview {
                 student.checkTrailingModules(); // Calculate trailing status for each student
             }
         } else {
-            System.out.println("No students found for the specified programme codes.");
+            // System.out.println("No students found for the specified programme codes.");
         }
 
         System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
@@ -57,7 +61,7 @@ public class Qlikview {
         return students;
     }
 
-    public static List<Student> locateQlikviewFiles(String folderPath, String targetProgrammeCode) throws IOException {
+    public static List<Student> locateQlikviewFiles(String folderPath,String logFolderPath, String targetProgrammeCode) throws IOException {
         List<Student> students = new ArrayList<>();
 
         File folder = new File(folderPath);
@@ -67,13 +71,13 @@ public class Qlikview {
             // First pass: Read programme data to create Student objects
             for (File file : files) {
                 if (file.getName().contains(targetProgrammeCode) && file.getName().contains("Programme")) {
-                    students.addAll(readProgrammeData(file)); // Read programme data from the file
+                    students.addAll(readProgrammeData(file,logFolderPath)); // Read programme data from the file
                 }
             }
             // Second pass: Add module data to the existing Student objects
             for (File file : files) {
                 if (file.getName().contains("Module")) {
-                    addModulesToStudents(file, students); // Add module data to students
+                    addModulesToStudents(file, logFolderPath,students); // Add module data to students
                 }
             }
         } else {
@@ -83,9 +87,9 @@ public class Qlikview {
         return students;
     }
 
-    public static List<Student> readProgrammeData(File file) throws IOException {
+    public static List<Student> readProgrammeData(File file, String logFolderPath) throws IOException {
         List<Student> students = new ArrayList<>();
-        File logDir = new File("result/log");
+        File logDir = new File(logFolderPath);
         if (!logDir.exists()) {
             logDir.mkdirs();
         }
@@ -228,8 +232,8 @@ public class Qlikview {
         return students;
     }
 
-    public static void addModulesToStudents(File file, List<Student> students) throws IOException {
-        File logDir = new File("result/log");
+    public static void addModulesToStudents(File file,String logFolderPath, List<Student> students) throws IOException {
+        File logDir = new File(logFolderPath);
         if (!logDir.exists()) {
             logDir.mkdirs();
         }
@@ -390,6 +394,7 @@ public class Qlikview {
              // Depending on the desired behavior, you might want to re-throw, wrap, or just log
              throw new RuntimeException("Unexpected error processing module file " + file.getName(), e);
         }
+        
     }
  
 }
