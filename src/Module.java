@@ -89,7 +89,7 @@ public class Module {
      * Updates module score, passed status, and overall status based on the moduleRecord field.
      * Sets the moduleInfoUpdated flag to true after processing.
      */
-    public void updateModuleInfo() {
+    public String updateModuleInfo() {
         if (moduleRecord != null && !moduleRecord.trim().isEmpty()) {
             // Attempt to parse score
             try {
@@ -99,7 +99,7 @@ public class Module {
                     int score = Integer.parseInt(digitsOnly);
                     this.moduleScore = score;
                     this.modulePassed = score > 40; // Assuming 40 is the pass mark
-                    System.out.println("Score Parsed: " + score + " for Module: " + moduleID); // Keep for debugging?
+                    // System.out.println("Score Parsed: " + score + " for Module: " + moduleID); // Keep for debugging?
                 } else {
                     // Handle cases where moduleRecord has no digits (e.g., "NS", "MM")
                     this.moduleScore = null; // Or 0, depending on desired logic
@@ -146,7 +146,8 @@ public class Module {
         }
 
         this.moduleInfoUpdated = true;
-        System.out.println("Module Info Updated: " + this.toString()); // Keep for debugging?
+        String updateInfo= "Module Info Updated: " + this.toString(); // Keep for debugging?
+        return updateInfo; // Return a string indicating the update status
     }
 
     /**
