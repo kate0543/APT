@@ -17,7 +17,7 @@ public class Student {
     private List<Module> modules = new ArrayList<>(); // List of modules the student is currently registered for
     private List<Module> trailingModules = new ArrayList<>(); // List of modules the student needs to retake (status 'RP')
     private List<Component> failedComponents = new ArrayList<>(); // List of failed components in the modules
-
+    
     // Student identity and status
     private int bannerID; // Unique student identifier (Banner system)
     private int networkID; // Student network/Blackboard identifier
@@ -371,9 +371,18 @@ public class Student {
     // toString method
     @Override
     public String toString() {
-        int totalComponentCount = 0;
-        int failedComponentCount = 0;
+        StringBuilder sb = new StringBuilder();
+        sb.append("Student{");
+        sb.append("bannerID=").append(bannerID);
+        sb.append(", name='").append(name).append('\'');
+        sb.append(", programmeYear=").append(programmeYear);
+        sb.append(", programmeCode='").append(programmeCode).append('\'');
+        sb.append(", programmeRegStatusCode='").append(programmeRegStatusCode).append('\'');
+        sb.append(", studentType='").append(studentType).append('\'');
+        sb.append(", isTrailing=").append(isTrailing);
+        sb.append(", modules amount=").append(modules != null ? modules.size() : 0);
 
+        int totalComponentCount = 0;
         if (this.modules != null) {
             for (Module module : this.modules) {
                 if (module != null) {
@@ -384,25 +393,58 @@ public class Student {
                 }
             }
         }
-        if (this.failedComponents != null) {
-            failedComponentCount = this.failedComponents.size();
+        sb.append(", components amount=").append(totalComponentCount);
+
+        if (this.trailingModules != null && !this.trailingModules.isEmpty()) {
+            sb.append(", trailingModules amount=").append(this.trailingModules.size());
+            sb.append(", trailingModuleTitles=[");
+            for (int i = 0; i < this.trailingModules.size(); i++) {
+                Module trailingModule = this.trailingModules.get(i);
+                sb.append(trailingModule != null ? trailingModule.getModuleTitle() : "N/A");
+                if (i < this.trailingModules.size() - 1) {
+                    sb.append(", ");
+                }
+            }
+            sb.append("]");
+        } else {
+            sb.append(", trailingModules amount=0");
         }
 
-        return "Student{" +
-                "bannerID=" + bannerID +
-                ", name='" + name + '\'' +
-                ", programmeYear=" + programmeYear +
-                ", programmeCode='" + programmeCode + '\'' +
-                ", programmeRegStatusCode='" + programmeRegStatusCode + '\'' +
-                ", studentType='" + studentType + '\'' +
-                ", isTrailing=" + isTrailing +
-                ", modules amount=" + (modules != null ? modules.size() : 0) +
-                ", components amount=" + totalComponentCount +
-                ", failed components=" + failedComponentCount +
-                ", trailingModules amount=" + (trailingModules != null ? trailingModules.size() : 0) +
-                ", studentLastTermAttendanceRate=" + studentLastTermAttendanceRate + "%" +
-                (totalSessionCountLastTerm != null ? ", totalSessionCountLastTerm=" + totalSessionCountLastTerm : "") +
-                (notAttendedSessionCountLastTerm != null ? ", notAttendedSessionCountLastTerm=" + notAttendedSessionCountLastTerm : "") +
-                '}';
+        if (this.failedComponents != null && !this.failedComponents.isEmpty()) {
+            sb.append(", failed components=").append(this.failedComponents.size());
+            sb.append(", failedDetails=[");
+            for (int i = 0; i < this.failedComponents.size(); i++) {
+                Component failedComponent = this.failedComponents.get(i);
+                if (failedComponent != null) {
+                    // Find the module this component belongs to (assuming component has a reference or we search)
+                    String moduleTitle = "Unknown Module";
+                    String moduleCRN = failedComponent.getModuleCRN(); // Assuming Component has getModuleCRN()
+                    Module parentModule = getModuleByCRN(moduleCRN);
+                    if (parentModule != null) {
+                        moduleTitle = parentModule.getModuleTitle();
+                    }
+                    sb.append("{Module: ").append(moduleTitle)
+                      .append(", Component: ").append(failedComponent.getComponentTitle()).append("}"); // Assuming Component has getComponentTitle()
+                } else {
+                    sb.append("{N/A}");
+                }
+                if (i < this.failedComponents.size() - 1) {
+                    sb.append(", ");
+                }
+            }
+            sb.append("]");
+        } else {
+             sb.append(", failed components=0");
+        }
+
+        sb.append(", studentLastTermAttendanceRate=").append(studentLastTermAttendanceRate).append("%");
+        if (totalSessionCountLastTerm != null) {
+            sb.append(", totalSessionCountLastTerm=").append(totalSessionCountLastTerm);
+        }
+        if (notAttendedSessionCountLastTerm != null) {
+            sb.append(", notAttendedSessionCountLastTerm=").append(notAttendedSessionCountLastTerm);
+        }
+        sb.append('}');
+        return sb.toString();
     }
 }
