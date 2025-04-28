@@ -1,6 +1,7 @@
 package src;
 
 import java.util.List;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 
 public class DataPipeline {
@@ -48,19 +49,19 @@ public class DataPipeline {
         // Example: Uncomment and adjust as needed for your logic
 
         // Priority if last term attendance rate is less than 30%
-        // if (student.getStudentLastTermAttendanceRate() < 30) {
-        //     reasons.add("Attendance is low: " + student.getStudentLastTermAttendanceRate() + "%");
-        // }
+        if (student.getStudentLastTermAttendanceRate() < 30) {
+            reasons.add("Attendance is low: " + student.getStudentLastTermAttendanceRate() + "%");
+        }
 
         // Priority if registration status is "new"
-        // if (student.getProgrammeRegStatus() != null && student.getProgrammeRegStatus().equalsIgnoreCase("new")) {
-        //     reasons.add("New registration status");
-        // }
+        if (student.getProgrammeRegStatus() != null && student.getProgrammeRegStatus().equalsIgnoreCase("new")) {
+            reasons.add("New registration status");
+        }
 
         // Priority if student has trailing modules
-        // if (student.isTrailing()) {
-        //     reasons.add("Has trailing modules");
-        // }
+        if (student.isTrailing()) {
+            reasons.add("Has trailing modules");
+        }
 
         // Priority if student has failed components
         if (student.getFailedComponents().size() != 0) {
@@ -199,5 +200,22 @@ public class DataPipeline {
             }
         }
         return cleanedList;
+    }
+     public static void log(PrintWriter writer, String level, String file, String message) {
+        // Format timestamp
+        String timestamp = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date());
+        
+        // Escape any commas in the message to preserve CSV structure
+        message = message.replace("\"", "\"\"");
+        if (message.contains(",")) {
+            message = "\"" + message + "\"";
+        }
+        
+        // Write the log entry
+        writer.println(timestamp + "," + level + ",\"" + file + "\"," + message);
+        writer.flush();
+        
+        // Also print to console for debugging
+        // System.out.println("[" + level + "] " + file + ": " + message);
     }
 }
