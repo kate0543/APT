@@ -38,7 +38,8 @@ public class SourceDoc {
             System.err.println("No matching source files found: " + tabNameString);
             return null;
         } else {
-            return readSourceData(files);
+
+            return readSourceDataAllAssessments(files.get(0));
         }
     }
 
@@ -56,7 +57,7 @@ public class SourceDoc {
                 return students;
             }
 
-            List<Module> modules = readSourceData(files);
+            List<Module> modules = readSourceDataAllAssessments(files.get(0));
 
             // For each student, update their module components with the deadline from the source data
             for (Student student : students) {
@@ -104,162 +105,6 @@ public class SourceDoc {
         }
         return values[index].trim();
     }
-
-    public static List<Module> readSourceData(List<File> files) throws IOException {
-        List<Module> modulesList = new ArrayList<>();
-
-        // Define expected header names
-        final String CRN_HEADER = "CRN";
-        final String COMPONENT_DESC_HEADER = "COMPONENT_DESCRIPTION";
-        final String SUBMISSION_DATE_HEADER = "Submission Date";
-        final String MODULE_LEADER_HEADER = "Module Leader";
-        final String COMPONENT_CODE_HEADER = "Component Code";
-        final String MODULE_ADMIN_TEAM_HEADER = "Module Admin Team";
-
-        for (File file : files) {
-            try {
-                // Read all lines from the CSV file using NIO
-                List<String> lines = Files.readAllLines(file.toPath());
-
-                // Clean the lines (e.g., remove double quotes) using a hypothetical DataPipeline class
-                // Ensure DataPipeline.cleanLines is implemented and available in the scope.
-                // Consider potential exceptions thrown by cleanLines.
-                lines = DataPipeline.cleanLines(lines);
-
-                // Check if the file is empty after cleaning
-                if (lines.isEmpty()) {
-                    System.err.println("Warning: File is empty or became empty after cleaning: " + file.getName());
-                    continue; // Skip to the next file
-                }
-
-                // Get the header line (the first line from the list)
-                String line = lines.get(0);
-                if (line.isEmpty()) {
-                    System.err.println("Warning: Header line is empty after cleaning: " + file.getName());
-                    continue; // Skip to the next file
-                }
-                // Remove BOM if present (often found in UTF-8 files from Windows)
-                if (line.startsWith("\uFEFF")) {
-                    line = line.substring(1);
-                }
-
-
-                // Note: The subsequent code block needs modification.
-                // Instead of using 'reader.readLine()' in a loop,
-                // it should iterate through the 'lines' list starting from index 1.
-                // Example: for (int i = 1; i < lines.size(); i++) { String dataLine = lines.get(i); ... }
-
-
-                // Simple CSV split, assumes no commas within quoted fields
-                String[] headers = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1);
-                System.out.println("Processing file: " + file.getName() + ", Headers: " + Arrays.toString(headers));
-                System.out.println("Header count: " + headers.length);
-                for (String header : headers) {
-                    System.out.println("Header: " + header.trim());
-                }
-                Map<String, Integer> columnIndexMap = new HashMap<>();
-                for (int i = 0; i < headers.length; i++) {
-                    columnIndexMap.put(headers[i].trim(), i);
-                }
-
-                // Validate required columns exist
-                List<String> requiredHeaders = List.of(CRN_HEADER, COMPONENT_DESC_HEADER, SUBMISSION_DATE_HEADER, MODULE_LEADER_HEADER);
-                boolean missingHeader = false;
-                for (String header : requiredHeaders) {
-                    if (!columnIndexMap.containsKey(header)) {
-                        System.err.println("Warning: File " + file.getName() + " is missing required column: " + header);
-                        missingHeader = true;
-                    }
-                }
-                if (missingHeader) {
-                    continue;
-                }
-
-                // Iterate through the cleaned lines, starting from the second line (index 1)
-                for (int i = 1; i < lines.size(); i++) {
-                    String dataLine = lines.get(i);
-                    if (dataLine.isEmpty()) {
-                        continue; // Skip empty lines
-                    }
-
-                    // Simple CSV split, assumes no commas within quoted fields after cleaning
-                    String[] values = dataLine.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1);
-
-                    // Debugging: Check for problematic values (optional)
-                    // for(String value : values) {
-                    //     if(value.contains("\"")) {
-                    //         System.out.println("Value with quotes: " + value.trim());
-                    //     }
-                    //     if(value.contains(",")) {
-                    //         System.out.println("Value with comma: " + value.trim());
-                    //     }
-                    //     // System.out.println("Value: " + value.trim());
-                    // }
-
-                    String crn = getValue(values, columnIndexMap, CRN_HEADER);
-                    String componentDesc = getValue(values, columnIndexMap, COMPONENT_DESC_HEADER);
-                    String submissionDate = getValue(values, columnIndexMap, SUBMISSION_DATE_HEADER);
-                    String moduleLeader = getValue(values, columnIndexMap, MODULE_LEADER_HEADER);
-                    String componentCode = getValue(values, columnIndexMap, COMPONENT_CODE_HEADER);
-                    String moduleAdminTeam = getValue(values, columnIndexMap, MODULE_ADMIN_TEAM_HEADER);
-
-                    if ("null".equals(crn) || crn.isEmpty()) {
-                        // Log or handle rows with missing CRN if necessary
-                        continue; // Skip rows without a valid CRN
-                    }
-
-                    // Find existing module in the list or create a new one
-                    Module currentModule = null;
-                    for (Module module : modulesList) {
-                        if (module.getModuleCRN().equals(crn)) {
-                            currentModule = module;
-                            break;
-                        }
-                    }
-
-                    if (currentModule == null) {
-                        currentModule = new Module();
-                        currentModule.setModuleCRN(crn);
-                        modulesList.add(currentModule);
-                    }
-
-                    // Update module leader and admin team (potentially overwrites if multiple leaders/teams listed for same CRN)
-                    // Only update if the value is not "null" (as returned by getValue)
-                    if (!"null".equals(moduleLeader)) {
-                        currentModule.setModuleLeader(moduleLeader);
-                    }
-                    if (!"null".equals(moduleAdminTeam)) {
-                        currentModule.setModuleAdminTeam(moduleAdminTeam);
-                    }
-
-                    // Create and add the component if component description is valid
-                    if (!"null".equals(componentDesc) && !componentDesc.isEmpty()) {
-                        Component component = new Component();
-                        component.setComponentTitle(componentDesc);
-                        // Debugging for quotes in component title (optional)
-                        // if(componentDesc.contains("\""))
-                        //     System.out.println("Component Title: " + componentDesc);
-
-                        if (!"null".equals(submissionDate)) {
-                            component.setComponentDeadline(submissionDate);
-                        } else {
-                            component.setComponentDeadline("N/A"); // Set default if submission date is missing
-                        }
-                        if (!"null".equals(componentCode)) {
-                            component.setComponentCode(componentCode);
-                        }
-                        // Add component to the module
-                        currentModule.addComponent(component);
-                    }
-                }
-            } catch (IOException e) {
-                System.err.println("Error reading source file " + file.getName() + ": " + e.getMessage());
-                // Continue with the next file
-            }
-        }
-        return modulesList;
-    }
-
     public static List<File> locateSourceFiles(String folderPath, String tabNameString) throws IOException {
         List<File> matchingFiles = new ArrayList<>();
         File folder = new File(folderPath);
@@ -283,6 +128,9 @@ public class SourceDoc {
         return matchingFiles;
     }
 
+
+    
+
     /**
      * Verifies if the number of components for each module in the students list
      * matches the number of components for the corresponding module in the source data.
@@ -291,8 +139,13 @@ public class SourceDoc {
      * @param sourceModules The list of modules read from the source document, used as the reference.
      */
     public static void verifyComponentCounts(List<Student> students, List<Module> sourceModules) {
-        System.out.println("--- Starting Component Count Verification ---");
-        String logFileName = "component_verification_log.csv"; // Name of the log file
+
+        File logDir = new File("result/log");
+        if (!logDir.exists()) {
+            logDir.mkdirs();
+        }
+        String logFileName = "SourceDoc_component_verification_log.csv";
+        File logFile = new File(logDir, logFileName);
 
         // Create a map of source modules by CRN for quick lookup
         Map<String, Module> sourceModuleMap = new HashMap<>();
@@ -303,17 +156,22 @@ public class SourceDoc {
         }
 
         // Use try-with-resources to ensure the writer is closed automatically
-        try (PrintWriter writer = new PrintWriter(new FileWriter(logFileName))) {
-            // Write CSV header
-            writer.println("Student Name,Student ID,Module CRN,Student Component Count,Source Component Count,Student Components,Source Components");
+        try (PrintWriter logWriter = new PrintWriter(new FileWriter(logFile))) {
+            // Write CSV header manually as log function doesn't handle headers
+            logWriter.println("Timestamp,Level,File,Message,Student Name,Student ID,Module CRN,Student Component Count,Source Component Count,Student Components,Source Components");
+            logWriter.flush(); // Ensure header is written immediately
+
+            DataPipeline.log(logWriter, "INFO", "verifyComponentCounts", "Starting Component Count Verification");
 
             for (Student student : students) {
                 if (student.getModules() == null) {
+                    DataPipeline.log(logWriter, "DEBUG", "verifyComponentCounts", "Skipping student with null modules: " + student.getName());
                     continue; // Skip student if they have no modules
                 }
 
                 for (Module studentModule : student.getModules()) {
                     if (studentModule == null || studentModule.getModuleCRN() == null) {
+                        DataPipeline.log(logWriter, "DEBUG", "verifyComponentCounts", "Skipping null module or module with null CRN for student: " + student.getName());
                         continue; // Skip if module or CRN is null
                     }
 
@@ -321,8 +179,10 @@ public class SourceDoc {
                     Module sourceModule = sourceModuleMap.get(crn);
 
                     if (sourceModule == null) {
-                        // Log this case if needed, maybe to a separate log or console
-                        // System.out.println("Warning: Source module not found for CRN: " + crn + " for student: " + student.getName());
+                        // Log this case if needed
+                        String message = String.format("Source module not found for CRN: %s for student: %s (%d)",
+                                crn, student.getName(), student.getBannerID());
+                        DataPipeline.log(logWriter, "WARN", "verifyComponentCounts", message);
                         continue; // Skip verification if source module doesn't exist
                     }
 
@@ -330,7 +190,6 @@ public class SourceDoc {
                     int sourceComponentCount = (sourceModule.getComponents() != null) ? sourceModule.getComponents().size() : 0;
 
                     if (studentComponentCount != sourceComponentCount) {
-                        // Mismatch found, prepare data for CSV row
                         String studentName = student.getName().replace(",", ""); // Basic handling for commas in names
                         Integer bannerId = student.getBannerID();
                         String moduleCrn = crn;
@@ -339,28 +198,60 @@ public class SourceDoc {
                         String studentComponentsStr = formatComponentList(studentModule.getComponents());
                         String sourceComponentsStr = formatComponentList(sourceModule.getComponents());
 
-                        // Write the mismatch details to the CSV file
-                        writer.printf("\"%s\",\"%s\",\"%s\",%d,%d,\"%s\",\"%s\"\n",
-                                studentName,
-                                bannerId,
-                                moduleCrn,
-                                studentComponentCount,
-                                sourceComponentCount,
-                                studentComponentsStr,
-                                sourceComponentsStr);
+                        // Construct the detailed message for logging
+                        String mismatchMessage = String.format(
+                            "Component count mismatch for Student: %s (%d), Module CRN: %s. Student Count: %d, Source Count: %d. Student Components: [%s], Source Components: [%s]",
+                            studentName,
+                            bannerId,
+                            moduleCrn,
+                            studentComponentCount,
+                            sourceComponentCount,
+                            studentComponentsStr,
+                            sourceComponentsStr
+                        );
+                        // Log the mismatch details using the log function
+                        DataPipeline.log(logWriter, "ERROR", "verifyComponentCounts", mismatchMessage);
 
-                        // Optional: Still print to console if desired
-                        System.out.println("\nComponent count mismatch found (logged to " + logFileName + "):");
-                        System.out.println("  Student: " + student.getName() + " (ID: " + student.getBannerID() + ")");
-                        System.out.println("  Module CRN: " + crn);
-                        System.out.println("  Student Count: " + studentComponentCount + ", Source Count: " + sourceComponentCount);
+                        // Log a simpler version indicating mismatch found and logged
+                        String summaryMessage = String.format(
+                            "Component count mismatch found (logged) for Student: %s (%d), Module CRN: %s. Student: %d, Source: %d",
+                            student.getName(),
+                            student.getBannerID(),
+                            crn,
+                            studentComponentCount,
+                            sourceComponentCount
+                        );
+                         DataPipeline.log(logWriter, "ERROR", "verifyComponentCounts", summaryMessage);
+                    } else {
+                         String matchMessage = String.format(
+                            "Component count matches for Student: %s (%d), Module CRN: %s. Count: %d",
+                            student.getName(),
+                            student.getBannerID(),
+                            crn,
+                            studentComponentCount
+                        );
+                        DataPipeline.log(logWriter, "DEBUG", "verifyComponentCounts", matchMessage);
                     }
                 }
             }
-            System.out.println("--- Verification Complete --- Log saved to " + logFileName);
+            // Log completion
+            DataPipeline.log(logWriter, "INFO", "verifyComponentCounts", "Verification Complete - Log saved to " + logFileName);
 
         } catch (IOException e) {
-            System.err.println("Error writing component verification log to " + logFileName + ": " + e.getMessage());
+            // Attempt to log the error using a new writer in append mode
+            try (PrintWriter errorWriter = new PrintWriter(new FileWriter(logFile, true))) {
+                 String fatalMessage = String.format("Error writing component verification log to %s: %s", logFileName, e.getMessage());
+                 DataPipeline.log(errorWriter, "FATAL", "verifyComponentCounts", fatalMessage);
+                 // Log stack trace elements
+                 for (StackTraceElement element : e.getStackTrace()) {
+                     DataPipeline.log(errorWriter, "FATAL", "verifyComponentCounts", "  at " + element.toString());
+                 }
+            } catch (IOException ex) {
+                // If logging the error itself fails, print to standard error
+                System.err.println("FATAL: Could not write to log file " + logFileName + ": " + ex.getMessage());
+                System.err.println("Original Error during verification: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
     }
 
@@ -392,5 +283,155 @@ public class SourceDoc {
         }
         return sb.toString();
     }
+ 
+        public static List<Module> readSourceDataAllAssessments(File file) throws IOException {
+            List<Module> modulesList = new ArrayList<>();
+            File logDir = new File("result/log");
+            if (!logDir.exists()) {
+            logDir.mkdirs();
+            }
+            File logFile = new File(logDir, "SourceDoc_readSourceDataAllAssessments_log.csv");
+
+            // Define expected header names
+            final String CRN_HEADER = "CRN";
+            final String COMPONENT_DESC_HEADER = "COMPONENT_DESCRIPTION";
+            final String SUBMISSION_DATE_HEADER = "Submission Date";
+            final String MODULE_LEADER_HEADER = "Module Leader";
+            final String MODULE_ADMIN_TEAM_HEADER = "Admin Team";
+
+            String line = "";
+            List<String> header = null;
+            int crnIndex = -1;
+            int componentDescIndex = -1;
+            int submissionDateIndex = -1;
+            int moduleLeaderIndex = -1;
+            int moduleAdminTeamIndex = -1;
+            Map<String, List<List<String>>> modules = new HashMap<>(); // This map seems unused, consider removing if not needed later
+
+            // Use try-with-resources for PrintWriter to ensure it's closed
+            try (PrintWriter logWriter = new PrintWriter(new FileWriter(logFile));
+             BufferedReader br = new BufferedReader(new FileReader(file))) {
+
+            DataPipeline.log(logWriter, "INFO", "readSourceDataAllAssessments", "Starting to read source data from file: " + file.getName());
+
+            while ((line = br.readLine()) != null) {
+                if (line.trim().isEmpty() || line.contains("PG")) { // Skip empty lines and lines containing "PG"
+                DataPipeline.log(logWriter, "DEBUG", "readSourceDataAllAssessments", "Skipping line: " + line);
+                continue;
+                }
+
+                String[] values = line.split(","); // Use comma as separator
+
+                if (header == null) {
+                header = java.util.Arrays.asList(values);
+                DataPipeline.log(logWriter, "INFO", "readSourceDataAllAssessments", "Header found: " + header);
+                // Find indexes for all relevant headers
+                for (int i = 0; i < header.size(); i++) {
+                    String col = header.get(i).trim().replaceAll("^\"|\"$", ""); // Trim and remove surrounding quotes
+                    if (col.equalsIgnoreCase(CRN_HEADER)) crnIndex = i;
+                    else if (col.equalsIgnoreCase(COMPONENT_DESC_HEADER)) componentDescIndex = i;
+                    else if (col.equalsIgnoreCase(SUBMISSION_DATE_HEADER)) submissionDateIndex = i;
+                    else if (col.equalsIgnoreCase(MODULE_LEADER_HEADER)) moduleLeaderIndex = i;
+                    else if (col.equalsIgnoreCase(MODULE_ADMIN_TEAM_HEADER)) moduleAdminTeamIndex = i;
+                }
+                // Check if essential columns were found
+                if (crnIndex == -1) {
+                    DataPipeline.log(logWriter, "ERROR", "readSourceDataAllAssessments", "'" + CRN_HEADER + "' column not found in header: " + header);
+                    // Optionally throw an exception or return early if CRN is mandatory
+                    // throw new IOException("'" + CRN_HEADER + "' column not found in header.");
+                }
+                if (componentDescIndex == -1) DataPipeline.log(logWriter, "WARN", "readSourceDataAllAssessments", "'" + COMPONENT_DESC_HEADER + "' column not found.");
+                if (submissionDateIndex == -1) DataPipeline.log(logWriter, "WARN", "readSourceDataAllAssessments", "'" + SUBMISSION_DATE_HEADER + "' column not found.");
+                if (moduleLeaderIndex == -1) DataPipeline.log(logWriter, "WARN", "readSourceDataAllAssessments", "'" + MODULE_LEADER_HEADER + "' column not found.");
+                if (moduleAdminTeamIndex == -1) DataPipeline.log(logWriter, "WARN", "readSourceDataAllAssessments", "'" + MODULE_ADMIN_TEAM_HEADER + "' column not found.");
+
+                continue; // Skip processing the header row itself
+                }
+
+                // Ensure the row has enough columns for the required indices
+                if (values.length <= Math.max(crnIndex, Math.max(componentDescIndex, Math.max(submissionDateIndex, Math.max(moduleLeaderIndex, moduleAdminTeamIndex))))) {
+                 DataPipeline.log(logWriter, "WARN", "readSourceDataAllAssessments", "Skipping row due to insufficient columns: " + Arrays.toString(values));
+                 continue;
+                }
+
+
+                // Extract values safely using indices, trim whitespace and remove quotes
+                String crn = (crnIndex != -1 && crnIndex < values.length) ? values[crnIndex].trim().replaceAll("^\"|\"$", "") : "";
+                String componentDesc = (componentDescIndex != -1 && componentDescIndex < values.length) ? values[componentDescIndex].trim().replaceAll("^\"|\"$", "") : "";
+                String submissionDate = (submissionDateIndex != -1 && submissionDateIndex < values.length) ? values[submissionDateIndex].trim().replaceAll("^\"|\"$", "") : "";
+                String moduleLeader = (moduleLeaderIndex != -1 && moduleLeaderIndex < values.length) ? values[moduleLeaderIndex].trim().replaceAll("^\"|\"$", "") : "";
+                String moduleAdminTeam = (moduleAdminTeamIndex != -1 && moduleAdminTeamIndex < values.length) ? values[moduleAdminTeamIndex].trim().replaceAll("^\"|\"$", "") : "";
+
+                if (crn.isEmpty()) {
+                DataPipeline.log(logWriter, "WARN", "readSourceDataAllAssessments", "Skipping row with empty CRN: " + Arrays.toString(values));
+                continue; // Skip rows without a CRN
+                }
+
+                // Find or create the module
+                Module module = modulesList.stream()
+                               .filter(m -> m.getModuleCRN() != null && m.getModuleCRN().equals(crn))
+                               .findFirst()
+                               .orElse(null);
+
+                if (module == null) {
+                module = new Module();
+                module.setModuleCRN(crn);
+                module.setModuleLeader(moduleLeader);
+                module.setModuleAdminTeam(moduleAdminTeam);
+                modulesList.add(module);
+                DataPipeline.log(logWriter, "DEBUG", "readSourceDataAllAssessments", "Created new module for CRN: " + crn);
+                } else {
+                // Update leader/admin only if they are currently empty/null
+                if ((module.getModuleLeader() == null || module.getModuleLeader().isEmpty()) && !moduleLeader.isEmpty()) {
+                    module.setModuleLeader(moduleLeader);
+                }
+                if ((module.getModuleAdminTeam() == null || module.getModuleAdminTeam().isEmpty()) && !moduleAdminTeam.isEmpty()) {
+                    module.setModuleAdminTeam(moduleAdminTeam);
+                }
+                }
+
+                // Create and add the component if description is not empty
+                if (!componentDesc.isEmpty()) {
+                Component component = new Component();
+                component.setModuleCRN(crn);
+                component.setComponentTitle(componentDesc);
+                component.setComponentDeadline(submissionDate);
+                // Avoid adding duplicate components (based on title)
+                boolean componentExists = module.getComponents().stream()
+                                .anyMatch(c -> c.getComponentTitle() != null && c.getComponentTitle().equals(componentDesc));
+                if (!componentExists) {
+                    module.getComponents().add(component);
+                    DataPipeline.log(logWriter, "DEBUG", "readSourceDataAllAssessments", "Added component '" + componentDesc + "' to module CRN: " + crn);
+                } else {
+                     DataPipeline.log(logWriter, "WARN", "readSourceDataAllAssessments", "Duplicate component title '" + componentDesc + "' skipped for module CRN: " + crn);
+                }
+                } else {
+                 DataPipeline.log(logWriter, "WARN", "readSourceDataAllAssessments", "Skipping component with empty description for module CRN: " + crn + " in row: " + Arrays.toString(values));
+                }
+            }
+            DataPipeline.log(logWriter, "INFO", "readSourceDataAllAssessments", "Finished reading source data. Total modules processed: " + modulesList.size());
+
+            } catch (IOException e) {
+            // Log the exception using a separate try-catch for the logger itself
+            try (PrintWriter errorWriter = new PrintWriter(new FileWriter(logFile, true))) { // Append mode for errors
+                DataPipeline.log(errorWriter, "FATAL", "readSourceDataAllAssessments", "Error reading file: " + file.getAbsolutePath() + ". Message: " + e.getMessage());
+                DataPipeline.log(errorWriter, "FATAL", "readSourceDataAllAssessments", "Current working directory: " + System.getProperty("user.dir"));
+                // Log stack trace elements
+                for (StackTraceElement element : e.getStackTrace()) {
+                 DataPipeline.log(errorWriter, "FATAL", "readSourceDataAllAssessments", "  at " + element.toString());
+                }
+            } catch (IOException logEx) {
+                // If logging fails, print to standard error as a last resort
+                System.err.println("FATAL: Error writing log file: " + logEx.getMessage());
+                System.err.println("Original Error reading file: " + file.getAbsolutePath() + ". Message: " + e.getMessage());
+                e.printStackTrace(); // Print original stack trace
+            }
+            // Re-throw the original exception to signal failure
+            throw e;
+            }
+            return modulesList;
+        }
+ 
+    }
     
-}
+
