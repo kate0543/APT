@@ -9,13 +9,13 @@ import javax.xml.crypto.Data;
 public class StEP {
 
     public static void main(String[] args) throws IOException {
-        String baseFolderPath = "data/BMT/";
+        String baseFolderPath = "data/SBMT/";
  
-        String targetProgrammeCode = "BMT";// Replace with the actual target programme codes
+        String targetProgrammeCode = "SBMT";// Replace with the actual target programme codes
         String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
 
         List<Student> students = new ArrayList<>();
-        students = fetchStudents(students, baseFolderPath, targetProgrammeCode);
+        students = fetchStudents(students, baseFolderPath, targetProgrammeCode, new DataPipeline()); // Fetch students from Qlikview data
 
         if (students == null) {
             System.out.println("No students found or error fetching students.");
@@ -32,35 +32,30 @@ public class StEP {
     /**
      * Fetch students and process attendance files.
      */
-    public static List<Student> fetchStudents(List<Student> students, String baseFolderPath, String targetProgrammeCode) throws IOException {
+    public static List<Student> fetchStudents(List<Student> students, String baseFolderPath, String targetProgrammeCode,DataPipeline pipeline) throws IOException {
 
-
-
-
-        students = Qlikview.fetchStudents(baseFolderPath, targetProgrammeCode);
-        students = EBR.fetchStudentsMR(students, baseFolderPath, targetProgrammeCode);
+        // students = Qlikview.fetchStudents(baseFolderPath, targetProgrammeCode);
+        // students = EBR.fetchStudents(students, baseFolderPath, targetProgrammeCode);
         
-        students = SourceDoc.fetchStudents(students, baseFolderPath, targetProgrammeCode);
+        // students = SourceDoc.fetchStudents(students, baseFolderPath, targetProgrammeCode);
 
-        students= IYR.fetchStudents(students, baseFolderPath, targetProgrammeCode);
+        students= IYR.fetchStudents(students, baseFolderPath, targetProgrammeCode, pipeline);
 
-        String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
+        String logFolderPath = pipeline.getLogFolderPath(targetProgrammeCode);
 
         List<File> matchingFiles = new ArrayList<>();
         try {
             // Get all files matching the pattern
-            matchingFiles = findMatchingFiles(baseFolderPath + "StEP/", "BMT");
+            matchingFiles = locateEBRFiles(baseFolderPath + "StEP/", "BMT");
 
             if (matchingFiles.isEmpty()) {
                 System.out.println("No matching files found in " + baseFolderPath + "StEP/");
                 return null;
             }
-
-            // Process each matching file
-            for (File file : matchingFiles) {
-                System.out.println("Processing file: " + file.getName());
-                System.out.println();
+            else for (File file : matchingFiles) {
+                System.out.println("Found "+matchingFiles.size()+" matching file: " + file.getAbsolutePath());
             }
+
 
         } catch (IOException e) {
             System.err.println("Error processing files: " + e.getMessage());
@@ -84,30 +79,18 @@ public class StEP {
     /**
      * Find files in the given folder that match the programme string and end with .csv.
      */
-    private static List<File> findMatchingFiles(String baseFolderString, String targetProgrammeString) throws IOException {
+    private static List<File> locateEBRFiles(String folderPath, String targetProgrammeCode) throws IOException {
         List<File> matchingFiles = new ArrayList<>();
-        Path baseFolderPath = Paths.get(baseFolderString);
 
-        if (!Files.exists(baseFolderPath) || !Files.isDirectory(baseFolderPath)) {
-            System.err.println("Base folder does not exist or is not a directory: " + baseFolderString);
-            return matchingFiles;
-        }
-
-        DirectoryStream.Filter<Path> filter = entry -> {
-            String fileName = entry.getFileName().toString();
-            // Check if it's a regular file, contains the target string, and ends with .csv
-            return Files.isRegularFile(entry) &&
-                   fileName.contains(targetProgrammeString) &&
-                   fileName.toLowerCase().endsWith(".csv");
-        };
-
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(baseFolderPath, filter)) {
-            for (Path entry : stream) {
-                matchingFiles.add(entry.toFile());
+        File folder = new File(folderPath);
+        File[] files = folder.listFiles((dir, name) -> name.endsWith(".csv") && name.contains(targetProgrammeCode));
+        System.out.println("Found " + (files != null ? files.length : 0) + " CSV files in folder: " + folder.getAbsolutePath());
+        if (files != null && files.length > 0) {
+            for (File file : files) {
+                matchingFiles.add(file);
             }
-        } catch (IOException e) {
-            System.err.println("Error reading directory: " + baseFolderString);
-            throw e;
+        } else {
+            System.err.println("No matching CSV files found in folder: " + folder.getAbsolutePath());
         }
 
         return matchingFiles;
@@ -225,18 +208,18 @@ public class StEP {
     try (PrintWriter logWriter = new PrintWriter(new FileWriter(logFile))) {
         logWriter.println("StudentName,BannerID,LastTermAttendanceRate");
         for (Student student : students) {
-        if (student.getStudentLastTermAttendanceRate() != null) {
-            if (student.getStudentLastTermAttendanceRate() < minAttendanceRate) {
-            lowAttendanceStudents.add(student);
-            log(logWriter, "INFO", "LowAttendance", student.getName() + "," + student.getBannerID() + "," + student.getStudentLastTermAttendanceRate());
+            if (student.getStudentLastTermAttendanceRate() != null) {
+                if (student.getStudentLastTermAttendanceRate() < minAttendanceRate) {
+                    lowAttendanceStudents.add(student);
+                    log(logWriter, "INFO", "LowAttendance", student.getName() + "," + student.getBannerID() + "," + student.getStudentLastTermAttendanceRate());
+                }
+            } else {
+                log(logWriter, "WARN", "LowAttendance", "Student " + student.getBannerID() + " has no last term attendance data.");
             }
-        } else {
-            log(logWriter, "WARN", "LowAttendance", "Student " + student.getBannerID() + " has no last term attendance data.");
         }
-        }
-        System.out.println("Low attendance students log written to: " + logFile + " with " + lowAttendanceStudents.size() + " students.");
+        log(logWriter, "INFO", "LowAttendance", "Low attendance students log written to: " + logFile + " with " + lowAttendanceStudents.size() + " students.");
     } catch (IOException e) {
-        System.err.println("Error writing low attendance students log: " + e.getMessage());
+        log(new PrintWriter(System.err), "ERROR", "LowAttendance", "Error writing low attendance students log: " + e.getMessage());
     }
     return lowAttendanceStudents;
     }
