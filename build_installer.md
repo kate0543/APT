@@ -1,74 +1,105 @@
-
+```plaintext
 APT/
-├──APT_DEMO/ 
-    ├── jre/
-    ├── Installer/
-    ├── SBS_LOGO.ico
-    ├── APT_Installer.iss
-    ├── APT.xml
-    ├── APT.jar
-    └── APT.exe
-  
-    
+├── APT_DEMO/
+│   ├── jre/
+│   ├── Installer/
+│   ├── SBS_LOGO.ico
+│   ├── APT_Installer.iss
+│   ├── APT.xml
+│   ├── APT.jar
+│   └── APT.exe
+```
 
+## Building and Packaging Instructions
 
+### 1. Compile Java Source
 
-To xcopy  JRE, in cmd, cd project path then
-"C:\Program Files\Eclipse Adoptium\jdk-21.0.5.11-hotspot\bin\javac" ^
-More? -source 17 -target 17 ^
-More? -d bin ^
-More? src\Main.java
-warning: [options] system modules path not set in conjunction with -source 17
-1 warning
+Open `cmd`, navigate to your project path:
 
-Foolproof JAR Creation
+```cmd
 cd /d "C:\Users\cocon\Documents\GitHub\APT"
+```
 
-:: 1. Delete existing files
+Delete old files and prepare directories:
+
+```cmd
 del APT_DEMO\APT.jar 2>nul
 rmdir /s /q bin 2>nul
 mkdir bin
+```
 
-:: 2. Compile with package awareness
-"C:\Program Files\Eclipse Adoptium\jdk-21.0.5.11-hotspot\bin\javac" ^
--d bin ^
-src\Main.java
+Compile with package awareness:
 
-:: 3. Build JAR - METHOD THAT ALWAYS WORKS
-"C:\Program Files\Eclipse Adoptium\jdk-21.0.5.11-hotspot\bin\jar" ^
-cvfe APT_DEMO\APT.jar src.Main ^
--C bin .
+```cmd
+"C:\Program Files\Eclipse Adoptium\jdk-21.0.5.11-hotspot\bin\javac" -d bin src\Main.java
+```
 
-Verification Steps
-cmd
-:: A. Check JAR structure
+> **Note:**  
+> You may see:  
+> `warning: [options] system modules path not set in conjunction with -source 17`  
+> This warning can be ignored for most use cases.
+
+### 2. Build the JAR
+
+```cmd
+"C:\Program Files\Eclipse Adoptium\jdk-21.0.5.11-hotspot\bin\jar" cvfe APT_DEMO\APT.jar src.Main -C bin .
+```
+
+### 3. Verify the JAR
+
+Check JAR structure:
+
+```cmd
 "C:\Program Files\Eclipse Adoptium\jdk-21.0.5.11-hotspot\bin\jar" tf APT_DEMO\APT.jar
+```
 
-:: B. Test both execution methods
+Test execution:
+
+```cmd
 java -jar APT_DEMO\APT.jar
 java -cp APT_DEMO\APT.jar src.Main
+```
 
-Optimize Your JRE
+### 4. Optimize Your JRE
+
+Create a minimal JRE using `jlink`:
+
+```cmd
 "C:\Program Files\Eclipse Adoptium\jdk-21.0.5.11-hotspot\bin\jlink.exe" ^
-More? --module-path "C:\Program Files\Eclipse Adoptium\jdk-21.0.5.11-hotspot\jmods" ^
-More? --add-modules java.base,java.desktop,java.sql ^
-More? --output "C:\Users\cocon\Documents\GitHub\APT\APT_DEMO\jre" ^
-More? --strip-debug --no-header-files --no-man-pages --compress=2
-Warning: The 2 argument for --compress is deprecated and may be removed in a future release
+    --module-path "C:\Program Files\Eclipse Adoptium\jdk-21.0.5.11-hotspot\jmods" ^
+    --add-modules java.base,java.desktop,java.sql ^
+    --output "C:\Users\cocon\Documents\GitHub\APT\APT_DEMO\jre" ^
+    --strip-debug --no-header-files --no-man-pages --compress=2
+```
 
-To build EXE, install Luanch4j in cmd
+> **Warning:**  
+> The `--compress=2` argument is deprecated and may be removed in a future release.
+
+### 5. Build the EXE
+
+Install [Launch4j](http://launch4j.sourceforge.net/), then run:
+
+```cmd
 cd "C:\Users\cocon\Documents\GitHub\APT"
 "C:\Program Files (x86)\Launch4j\launch4jc.exe" APT.xml
-Alternative Quick Build
+```
+
+**Alternative Quick Build:**
+
+```cmd
 cd "C:\Users\cocon\Documents\GitHub\APT"
 "C:\Program Files (x86)\Launch4j\launch4jc.exe" ^
---output "APT_DEMO\APT.exe" ^
---jar "APT_DEMO\APT.jar" ^
---main-class "src.Main" ^
---jre-min-version "21.0.0" ^
---bundled-jre-path "./jre" ^
---bundled-jre-64-bit ^
---icon "APT_DEMO\SBS_LOGO.ico" ^
---header-type "gui"
-To create installer, install Inno Setup
-Create APT_Installer put in APT_DEMO
+    --output "APT_DEMO\APT.exe" ^
+    --jar "APT_DEMO\APT.jar" ^
+    --main-class "src.Main" ^
+    --jre-min-version "21.0.0" ^
+    --bundled-jre-path "./jre" ^
+    --bundled-jre-64-bit ^
+    --icon "APT_DEMO\SBS_LOGO.ico" ^
+    --header-type "gui"
+```
+
+### 6. Create the Installer
+
+Install [Inno Setup](https://jrsoftware.org/isinfo.php).  
+Create the installer script (`APT_Installer.iss`) and place it in `APT_DEMO`.
