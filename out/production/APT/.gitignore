@@ -1,1 +1,5 @@
-/DATA
+*.xlsx
+*.docx
+*.csv
+*.log
+*.pdf

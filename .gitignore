@@ -3,3 +3,8 @@
 *.csv
 *.log
 *.pdf
+APT_Demo/jre
+bin
+.idea
+out
+dist
