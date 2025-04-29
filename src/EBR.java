@@ -7,7 +7,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
- 
 public class EBR {
 
     private static String Term = "";
@@ -19,61 +18,54 @@ public class EBR {
     private static String fileFormat = "CSV";
 
     public static void main(String[] args) throws IOException {
-        String baseFolderPath = "data/BMT/"; // Base folder path for Qlikview data
-        String targetProgrammeCode = "BMT";// Replace with the actual target programme codes
+        String baseFolderPath = "data/SBMT/"; // Base folder path for Qlikview data
+        String targetProgrammeCode = "SBMT"; // Replace with the actual target programme codes
         String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
 
         List<Student> students = new ArrayList<>(); // List to store all students
 
-        List<File> ModuleReports =locateEBRFiles(baseFolderPath+"EBR/", "ModuleReport",targetProgrammeCode);
+        List<File> ModuleReports = locateEBRFiles(baseFolderPath + "EBR/", "ModuleReport", targetProgrammeCode);
         // students = Qlikview.fetchStudents(baseFolderPath, targetProgrammeCodesList);
         // students = updateStudentsList(students, addComponentsToStudents(ModuleReports, students));
-        students = fetchStudentsMR(students, baseFolderPath, targetProgrammeCode);
-        students = fetchStudentsPR(students, baseFolderPath, targetProgrammeCode);
+        students = Qlikview.fetchStudents(baseFolderPath, targetProgrammeCode);
+        students = fetchStudents(students, baseFolderPath, targetProgrammeCode);
 
         for (Student student : students) {
-            for(Module module: student.getModules()){
-                        // System.out.println();
-                        // System.out.println("update matchingStudent "+student.getBannerID()+" "+student.getName());
-                        // System.out.println("Module CRN: " + module.getModuleCRN() +" Module ID: " + module.getModuleTitle());
-                       for(Component component: module.getComponents()){
-                           if(component.getComponentTitle() != null && !component.getComponentTitle().isEmpty()){
-                            if(component.getComponentTitle().contains("\"")) {
-                               System.out.println(component.getComponentTitle());
-                            }
-                           }
-                           
-                       }
-                       if(module.getComponents().isEmpty()){ 
-                        
-                            System.out.println("Student "+student.getBannerID()+" "+student.getName()+" has no components for module "+module.getModuleCRN());
-                    
-                       }
+            for (Module module : student.getModules()) {
+                // System.out.println();
+                // System.out.println("update matchingStudent "+student.getBannerID()+" "+student.getName());
+                // System.out.println("Module CRN: " + module.getModuleCRN() +" Module ID: " + module.getModuleTitle());
+                for (Component component : module.getComponents()) {
+                    if (component.getComponentTitle() != null && !component.getComponentTitle().isEmpty()) {
+                        if (component.getComponentTitle().contains("\"")) {
+                            System.out.println(component.getComponentTitle());
+                        }
+                    }
+                }
+                if (module.getComponents().isEmpty()) {
+                    // System.out.println("Student "+student.getBannerID()+" "+student.getName()+" has no components for module "+module.getModuleCRN());
+                }
             }
-    
         }
-    
-}
+    }
+
+    public static List<Student> fetchStudents(List<Student> students, String baseFolderPath, String targetProgrammeCode) throws IOException {
+        students = fetchStudentsMR(students, baseFolderPath, targetProgrammeCode);
+        students = fetchStudentsPR(students, baseFolderPath, targetProgrammeCode);
+        return students;
+    }
+
     public static List<Student> fetchStudentsMR(List<Student> students, String baseFolderPath, String targetProgrammeCode) throws IOException {
-        
         String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
 
-        List<String> targetProgrammeCodesList = List.of(targetProgrammeCode+".S", targetProgrammeCode+".F"); // Replace with the actual target programme codes
+        List<String> targetProgrammeCodesList = List.of(targetProgrammeCode + ".S", targetProgrammeCode + ".F"); // Replace with the actual target programme codes
+
+        students = Qlikview.fetchStudents(baseFolderPath, targetProgrammeCode);
 
         for (String code : targetProgrammeCodesList) {
             try {
-                students.addAll(Qlikview.fetchStudents(baseFolderPath, code));
-                System.out.println("Found " + students.size() + " students for programme code: " + targetProgrammeCode);
-            } catch (IOException e) {
-                System.err.println("An error occurred while reading Qlikview data: " + e.getMessage());
-                e.printStackTrace();
-            }
-        }
-        
-        for (String code : targetProgrammeCodesList) {
-            try {
-                List<File> files = locateEBRFiles(baseFolderPath + "/EBR","ModuleReport",code);
-                 students = updateStudentsList(students, addComponentsToStudents(files,logFolderPath, students));
+                List<File> files = locateEBRFiles(baseFolderPath + "/EBR", "ModuleReport", code);
+                students = updateStudentsList(students, addComponentsToStudents(files, logFolderPath, students));
             } catch (IOException e) {
                 System.err.println("An error occurred while processing EBR Module Report files: " + e.getMessage());
                 e.printStackTrace();
@@ -85,32 +77,33 @@ public class EBR {
             }
         }
         System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
-        System.out.println("                                EBR Module Reports Data processing completed.");
+        System.out.println("            EBR Module Reports Data processing completed.");
         System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
-    
-        return students;
-    }   
-        public static List<Student> fetchStudentsPR(List<Student> students, String baseFolderPath , String targetProgrammeCode) throws IOException {
 
-            String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
-        List<String> targetProgrammeCodesList = List.of(targetProgrammeCode+".S", targetProgrammeCode+".F"); // Replace with the actual target programme codes
+        return students;
+    }
+
+    public static List<Student> fetchStudentsPR(List<Student> students, String baseFolderPath, String targetProgrammeCode) throws IOException {
+        String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
+
+        List<String> targetProgrammeCodesList = List.of(targetProgrammeCode + ".S", targetProgrammeCode + ".F");
 
         for (String code : targetProgrammeCodesList) {
             try {
-                List<File> files = locateEBRFiles(baseFolderPath + "/EBR", "ProgrammeReport",code);
+                List<File> files = locateEBRFiles(baseFolderPath + "/EBR", "ProgrammeReport", code);
                 students = processProgrammeReport(files, logFolderPath, students);
             } catch (IOException e) {
-                System.err.println("An error occurred while processing EBR Porgramme files: " + e.getMessage());
+                System.err.println("An error occurred while processing EBR Programme Report files: " + e.getMessage());
                 e.printStackTrace();
             }
         }
         if (!students.isEmpty()) {
             for (Student student : students) {
-                student.checkFailedComponents(); // Check for failed modules
+                student.checkFailedComponents();
             }
         }
         System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
-        System.out.println("                                EBR Programme Reports Data processing completed.");
+        System.out.println("            EBR Programme Reports Data processing completed.");
         System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
 
         return students;
@@ -123,33 +116,25 @@ public class EBR {
     /**
      * Locates EBR files for a given programme code.
      */
-    public static List<File> locateEBRFiles(String folderPath,String reportType, String targetProgrammeCode) throws IOException {
+    public static List<File> locateEBRFiles(String folderPath, String reportType, String targetProgrammeCode) throws IOException {
         List<File> matchingFiles = new ArrayList<>();
+
         File folder = new File(folderPath);
-        if (folder.exists() && folder.isDirectory()) {
-            File[] files = folder.listFiles((dir, name) ->
-                name.endsWith(".csv") &&
-                name.contains(reportType) &&
-                name.contains(targetProgrammeCode)
-            );
-            if (files != null) {
-                for (File file : files) {
-                    matchingFiles.add(file);
-                }
+        File[] files = folder.listFiles((dir, name) -> name.endsWith(".csv") && name.contains(reportType) && name.contains(targetProgrammeCode));
+        System.out.println("Found " + (files != null ? files.length : 0) + " matching files for report type: " + reportType + " and programme code: " + targetProgrammeCode + " in folder: " + folder.getAbsolutePath());
+        if (files != null && files.length > 0) {
+            for (File file : files) {
+                matchingFiles.add(file);
             }
+        } else {
+            System.err.println("No matching CSV files found in folder: " + folder.getAbsolutePath());
         }
 
-        System.out.println("Found " + matchingFiles.size() + " matching files for report type: " + reportType + " and programme code: " + targetProgrammeCode);
-  
-
         matchingFiles.sort((f1, f2) -> f2.getName().compareTo(f1.getName()));
-        // for (File file : matchingFiles) {
-        //     System.out.println("Matching file: " + file.getName());
-        // }
-
         return matchingFiles;
     }
-    private static List<Student> processProgrammeReport(List<File> files,String logFolderPath, List<Student> students) {
+
+    private static List<Student> processProgrammeReport(List<File> files, String logFolderPath, List<Student> students) {
         // Create log directory and file
         File logDir = new File(logFolderPath);
         if (!logDir.exists()) {
@@ -179,7 +164,7 @@ public class EBR {
                     String programmeCode = extractValue(lines, "Programme code");
                     String programmeLevel = extractValue(lines, "Programme level");
                     DataPipeline.log(logWriter, "INFO", file.getName(), "Programme: " + programmeTitle +
-                                   " (" + programmeCode + ") Level: " + programmeLevel);
+                            " (" + programmeCode + ") Level: " + programmeLevel);
 
                     // Locate the "Module code" line
                     int moduleCRNLine = -1;
@@ -206,7 +191,7 @@ public class EBR {
                         }
                     }
                     DataPipeline.log(logWriter, "INFO", file.getName(), "Found " + validModuleCRNs.size() +
-                                   " module CRNs: " + String.join(", ", validModuleCRNs));
+                            " module CRNs: " + String.join(", ", validModuleCRNs));
 
                     // Find where student data begins (lines that start with "@")
                     int studentDataStart = -1;
@@ -240,7 +225,7 @@ public class EBR {
 
                         Student student = DataPipeline.findStudentById(students, bannerId);
                         if (student == null) {
-                            DataPipeline.log(logWriter, "INFO", file.getName(), "Student not found: " + bannerId +"in the provided qlikview student list");
+                            DataPipeline.log(logWriter, "INFO", file.getName(), "Student not found: " + bannerId + " in the provided qlikview student list");
                             continue;
                         }
 
@@ -275,6 +260,7 @@ public class EBR {
         }
         return students;
     }
+
     private static String extractValue(List<String> lines, String key) {
         for (String line : lines) {
             String[] parts = line.split(",");
@@ -293,7 +279,7 @@ public class EBR {
         }
         return null;
     }
- 
+
     public static Integer parseBannerID(String raw) {
         try {
             String cleaned = raw.replace("@", "").trim().split(",")[0].replaceFirst("^0+(?!$)", "");
@@ -303,17 +289,16 @@ public class EBR {
             return null;
         }
     }
- 
 
-    public static List<Student> addComponentsToStudents(List<File> csvFiles,String logFolderPath, List<Student> students) {
+    public static List<Student> addComponentsToStudents(List<File> csvFiles, String logFolderPath, List<Student> students) {
         List<Student> updatedStudents = students; // List to store updated students
-        
+
         // Create log directory and file
         File logDir = new File(logFolderPath);
         if (!logDir.exists()) {
             logDir.mkdirs();
         }
-        
+
         File logFile = new File(logDir, "EBR_Module_Report_loading_log.csv");
         try (PrintWriter logWriter = new PrintWriter(new FileWriter(logFile, true))) {
             // Write header if file is new
@@ -343,7 +328,7 @@ public class EBR {
                     // Extract component titles and their corresponding column indices
                     Map<Integer, String> componentTitleMap = new HashMap<>(); // Map column index to title
                     int componentTitleLineIndex = -1;
-                    int studentHeaderLineIndex = -1; 
+                    int studentHeaderLineIndex = -1;
 
                     for (int i = 0; i < lines.size(); i++) {
                         String line = lines.get(i);
@@ -353,11 +338,11 @@ public class EBR {
                         if (line.trim().toLowerCase().startsWith("student id")) {
                             studentHeaderLineIndex = i;
                         }
-                        if(componentTitleLineIndex != -1 && studentHeaderLineIndex != -1) break;
+                        if (componentTitleLineIndex != -1 && studentHeaderLineIndex != -1) break;
                     }
 
                     // Log file processing info
-                    DataPipeline.log(logWriter, "INFO", csvFile.getName(), moduleCRN + " " + moduleTitle + " " + moduleID);
+                    DataPipeline.log(logWriter, "INFO", csvFile.getName(), "found module info:" + moduleCRN + " " + moduleTitle + " " + moduleID);
 
                     if (componentTitleLineIndex != -1) {
                         String[] titleParts = lines.get(componentTitleLineIndex).split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1);
@@ -411,15 +396,15 @@ public class EBR {
                                 if (columnIndex < studentParts.length) {
                                     String rawRecord = studentParts[columnIndex].trim();
                                     Component component = new Component(
-                                        moduleCRN,
-                                        moduleID,
-                                        componentTitle,
-                                        rawRecord
+                                            moduleCRN,
+                                            moduleID,
+                                            componentTitle,
+                                            rawRecord
                                     );
                                     components.add(component);
                                 } else {
-                                    DataPipeline.log(logWriter, "WARNING", csvFile.getName(), "Missing data for component '" + componentTitle + 
-                                        "' (column " + columnIndex + ") for student " + bannerId);
+                                    DataPipeline.log(logWriter, "WARNING", csvFile.getName(), "Missing data for component '" + componentTitle +
+                                            "' (column " + columnIndex + ") for student " + bannerId);
                                     Component component = new Component(moduleCRN, moduleID, componentTitle, "");
                                     components.add(component);
                                 }
@@ -428,17 +413,17 @@ public class EBR {
                             if (!components.isEmpty()) {
                                 studentModule.setComponents(components);
                                 studentModule.setComponentDetailsLoaded(true);
-                                DataPipeline.log(logWriter, "INFO", csvFile.getName(), "Successfully added " + components.size() + 
-                                    " components for module " + moduleCRN + " student " + bannerId);
+                                DataPipeline.log(logWriter, "INFO", csvFile.getName(), "Successfully added " + components.size() +
+                                        " components for module " + moduleCRN + ":  " + moduleTitle + " student " + bannerId + ": " + matchingStudent.getName());
                             } else {
-                                DataPipeline.log(logWriter, "INFO", csvFile.getName(), "No components were added for module " + 
-                                    moduleCRN + " student " + bannerId);
+                                DataPipeline.log(logWriter, "INFO", csvFile.getName(), "No components were added for module " +
+                                        moduleCRN + " student " + bannerId + " " + matchingStudent.getName());
                             }
                         }
                     } else {
-                        if(studentHeaderLineIndex == -1) 
+                        if (studentHeaderLineIndex == -1)
                             DataPipeline.log(logWriter, "WARNING", csvFile.getName(), "'Student ID' line not found");
-                        if(componentTitleMap.isEmpty() && componentTitleLineIndex != -1) 
+                        if (componentTitleMap.isEmpty() && componentTitleLineIndex != -1)
                             DataPipeline.log(logWriter, "WARNING", csvFile.getName(), "Component titles found but map is empty - check parsing logic");
                         DataPipeline.log(logWriter, "WARNING", csvFile.getName(), "Skipping student data processing due to missing headers or titles");
                     }
@@ -463,9 +448,6 @@ public class EBR {
         return updatedStudents;
     }
 
-    // Helper method to log messages to the CSV file
-   
-
     /**
      * Updates the given list of students with new or modified student records.
      * If a student with the same BannerID exists, it is replaced; otherwise, the new student is added.
@@ -480,6 +462,4 @@ public class EBR {
         }
         return new ArrayList<>(studentMap.values());
     }
-
-
 }
