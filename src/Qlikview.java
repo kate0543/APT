@@ -7,10 +7,9 @@ import java.util.*;
 
 public class Qlikview {
     public static void main(String[] args) {
-        String baseFolderPath = "data/BMT/"; // Replace with the actual base folder path
+        String baseFolderPath = "data/SBMT/"; // Replace with the actual base folder path
         // Split by "/" and get the subfolder name (last non-empty part)
-  ;
-        String targetProgrammeCode = "BMT";// Replace with the actual target programme codes
+        String targetProgrammeCode = "SBMT"; // Replace with the actual target programme codes
         String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
         List<Student> students = new ArrayList<>(); // List to store all students
 
@@ -29,17 +28,16 @@ public class Qlikview {
             System.err.println("An error occurred while reading Qlikview data: " + e.getMessage());
             e.printStackTrace();
         }
- 
     }
 
     public static List<Student> fetchStudents(String baseFolderPath, String targetProgrammeCode) throws IOException {
         List<Student> students = new ArrayList<>();
         String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
-        List<String> targetProgrammeCodesList = List.of(targetProgrammeCode+".S", targetProgrammeCode+".F"); // Replace with the actual target programme codes
+        List<String> targetProgrammeCodesList = List.of(targetProgrammeCode + ".S", targetProgrammeCode + ".F"); // Replace with the actual target programme codes
         for (String code : targetProgrammeCodesList) {
             try {
-                students.addAll(locateQlikviewFiles(baseFolderPath + "/Qlikview/", logFolderPath,code));
-                // System.out.println("Found " + students.size() + " students for programme code: " + targetProgrammeCode);
+                students.addAll(locateQlikviewFiles(baseFolderPath + "/Qlikview/", logFolderPath, code));
+                System.out.println("Found " + students.size() + " students for programme code: " + code);
             } catch (IOException e) {
                 System.err.println("An error occurred while reading Qlikview data: " + e.getMessage());
                 e.printStackTrace();
@@ -50,8 +48,6 @@ public class Qlikview {
             for (Student student : students) {
                 student.checkTrailingModules(); // Calculate trailing status for each student
             }
-        } else {
-            // System.out.println("No students found for the specified programme codes.");
         }
 
         System.out.println("------------------------------------------------------------------------------------------------------------------------------------------------------------------");
@@ -61,23 +57,25 @@ public class Qlikview {
         return students;
     }
 
-    public static List<Student> locateQlikviewFiles(String folderPath,String logFolderPath, String targetProgrammeCode) throws IOException {
+    public static List<Student> locateQlikviewFiles(String folderPath, String logFolderPath, String targetProgrammeCode) throws IOException {
         List<Student> students = new ArrayList<>();
 
         File folder = new File(folderPath);
         File[] files = folder.listFiles((dir, name) -> name.endsWith(".csv") && name.contains(targetProgrammeCode));
-
+        System.out.println("Found " + (files != null ? files.length : 0) + " CSV files in folder: " + folder.getAbsolutePath());
         if (files != null && files.length > 0) {
             // First pass: Read programme data to create Student objects
             for (File file : files) {
                 if (file.getName().contains(targetProgrammeCode) && file.getName().contains("Programme")) {
-                    students.addAll(readProgrammeData(file,logFolderPath)); // Read programme data from the file
+                    System.out.println("Adding programme data from file: " + file.getName());
+                    students.addAll(readProgrammeData(file, logFolderPath)); // Read programme data from the file
                 }
             }
             // Second pass: Add module data to the existing Student objects
             for (File file : files) {
                 if (file.getName().contains("Module")) {
-                    addModulesToStudents(file, logFolderPath,students); // Add module data to students
+                    System.out.println("Adding module data from file: " + file.getName());
+                    addModulesToStudents(file, logFolderPath, students); // Add module data to students
                 }
             }
         } else {
@@ -130,7 +128,6 @@ public class Qlikview {
                     continue; // Skip this record if field is missing
                 }
 
-
                 // Safely get First Name
                 String firstName = columnIndexMap.containsKey("First Name") && fields.length > columnIndexMap.get("First Name") && !fields[columnIndexMap.get("First Name")].trim().isEmpty()
                         ? fields[columnIndexMap.get("First Name")].trim()
@@ -150,18 +147,17 @@ public class Qlikview {
 
                 // Safely parse Programme Year
                 int programmeYear = 0;
-                 try {
+                try {
                     programmeYear = columnIndexMap.containsKey("Programme Year") && fields.length > columnIndexMap.get("Programme Year") && !fields[columnIndexMap.get("Programme Year")].trim().isEmpty()
                             ? Integer.parseInt(fields[columnIndexMap.get("Programme Year")].trim())
                             : 0;
-                 } catch (NumberFormatException e) {
+                } catch (NumberFormatException e) {
                     DataPipeline.log(logWriter, "WARN", file.getName(), "Invalid Programme Year format on line " + lineNumber + " for Banner ID " + bannerID + ": " + (columnIndexMap.containsKey("Programme Year") && fields.length > columnIndexMap.get("Programme Year") ? fields[columnIndexMap.get("Programme Year")] : "N/A"));
                     // Decide if you want to skip or use default 0
-                 } catch (ArrayIndexOutOfBoundsException e) {
+                } catch (ArrayIndexOutOfBoundsException e) {
                     DataPipeline.log(logWriter, "WARN", file.getName(), "Missing Programme Year field on line " + lineNumber + " for Banner ID " + bannerID);
                     // Decide if you want to skip or use default 0
-                 }
-
+                }
 
                 // Safely get Reg Status Code
                 String programmeRegStatusCode = columnIndexMap.containsKey("Reg Status Code") && fields.length > columnIndexMap.get("Reg Status Code") && !fields[columnIndexMap.get("Reg Status Code")].trim().isEmpty()
@@ -184,10 +180,9 @@ public class Qlikview {
                         : null;
 
                 if (bannerID == 0) {
-                     DataPipeline.log(logWriter, "WARN", file.getName(), "Skipping record on line " + lineNumber + " due to missing or invalid Banner ID.");
-                     continue; // Skip if Banner ID is essential and missing/invalid
+                    DataPipeline.log(logWriter, "WARN", file.getName(), "Skipping record on line " + lineNumber + " due to missing or invalid Banner ID.");
+                    continue; // Skip if Banner ID is essential and missing/invalid
                 }
-
 
                 Student student = new Student(
                         programmeYear,
@@ -206,33 +201,36 @@ public class Qlikview {
                 students.add(student);
             }
             DataPipeline.log(logWriter, "INFO", file.getName(), "Successfully read " + students.size() + " student records.");
+            for (Student student : students) {
+                DataPipeline.log(logWriter, "INFO", file.getName(), "Student ID: " + student.getBannerID() + " Student Name: " + student.getName() + ", Programme Code: " + student.getProgrammeCode() + ", Year: " + student.getProgrammeYear());
+            }
         } catch (IOException e) {
             // Log the exception using a temporary writer if the main one failed or wasn't created
-             try (PrintWriter errorWriter = new PrintWriter(new FileWriter(logFile, true))) {
-                 DataPipeline.log(errorWriter, "ERROR", file.getName(), "IOException occurred while reading programme data: " + e.getMessage());
-             } catch (IOException logEx) {
-                 // If logging itself fails, print to stderr as a last resort
-                 System.err.println("Failed to write error log for IOException in readProgrammeData: " + logEx.getMessage());
-                 e.printStackTrace(); // Print original exception stack trace
-             }
-             throw e; // Re-throw the original exception
+            try (PrintWriter errorWriter = new PrintWriter(new FileWriter(logFile, true))) {
+                DataPipeline.log(errorWriter, "ERROR", file.getName(), "IOException occurred while reading programme data: " + e.getMessage());
+            } catch (IOException logEx) {
+                // If logging itself fails, print to stderr as a last resort
+                System.err.println("Failed to write error log for IOException in readProgrammeData: " + logEx.getMessage());
+                e.printStackTrace(); // Print original exception stack trace
+            }
+            throw e; // Re-throw the original exception
         } catch (Exception e) {
-             // Catch unexpected runtime exceptions during processing
-             try (PrintWriter errorWriter = new PrintWriter(new FileWriter(logFile, true))) {
-                 DataPipeline.log(errorWriter, "ERROR", file.getName(), "Unexpected error occurred while processing programme data: " + e.getMessage());
-             } catch (IOException logEx) {
-                 System.err.println("Failed to write error log for unexpected exception in readProgrammeData: " + logEx.getMessage());
-                 e.printStackTrace();
-             }
-             // Depending on the desired behavior, you might want to re-throw, wrap, or just log
-             // For now, just logging and continuing might lose data, re-throwing is safer if possible
-             throw new RuntimeException("Unexpected error processing file " + file.getName(), e);
+            // Catch unexpected runtime exceptions during processing
+            try (PrintWriter errorWriter = new PrintWriter(new FileWriter(logFile, true))) {
+                DataPipeline.log(errorWriter, "ERROR", file.getName(), "Unexpected error occurred while processing programme data: " + e.getMessage());
+            } catch (IOException logEx) {
+                System.err.println("Failed to write error log for unexpected exception in readProgrammeData: " + logEx.getMessage());
+                e.printStackTrace();
+            }
+            // Depending on the desired behavior, you might want to re-throw, wrap, or just log
+            // For now, just logging and continuing might lose data, re-throwing is safer if possible
+            throw new RuntimeException("Unexpected error processing file " + file.getName(), e);
         }
 
         return students;
     }
 
-    public static void addModulesToStudents(File file,String logFolderPath, List<Student> students) throws IOException {
+    public static void addModulesToStudents(File file, String logFolderPath, List<Student> students) throws IOException {
         File logDir = new File(logFolderPath);
         if (!logDir.exists()) {
             logDir.mkdirs();
@@ -288,17 +286,16 @@ public class Qlikview {
                     // Safely parse Year
                     int year = 0;
                     try {
-                         year = columnIndexMap.containsKey("Year") && fields.length > columnIndexMap.get("Year") && !fields[columnIndexMap.get("Year")].trim().isEmpty()
+                        year = columnIndexMap.containsKey("Year") && fields.length > columnIndexMap.get("Year") && !fields[columnIndexMap.get("Year")].trim().isEmpty()
                                 ? Integer.parseInt(fields[columnIndexMap.get("Year")].trim())
                                 : 0;
                     } catch (NumberFormatException e) {
-                         DataPipeline.log(logWriter, "WARN", file.getName(), "Invalid Year format on line " + lineNumber + " for Banner ID " + bannerID + ": " + (columnIndexMap.containsKey("Year") && fields.length > columnIndexMap.get("Year") ? fields[columnIndexMap.get("Year")] : "N/A") + ". Using default 0.");
-                         // Continue processing with default year 0
+                        DataPipeline.log(logWriter, "WARN", file.getName(), "Invalid Year format on line " + lineNumber + " for Banner ID " + bannerID + ": " + (columnIndexMap.containsKey("Year") && fields.length > columnIndexMap.get("Year") ? fields[columnIndexMap.get("Year")] : "N/A") + ". Using default 0.");
+                        // Continue processing with default year 0
                     } catch (ArrayIndexOutOfBoundsException e) {
-                         DataPipeline.log(logWriter, "WARN", file.getName(), "Missing Year field on line " + lineNumber + " for Banner ID " + bannerID + ". Using default 0.");
-                         // Continue processing with default year 0
+                        DataPipeline.log(logWriter, "WARN", file.getName(), "Missing Year field on line " + lineNumber + " for Banner ID " + bannerID + ". Using default 0.");
+                        // Continue processing with default year 0
                     }
-
 
                     // Create Module object using safe accessors
                     module = new Module(
@@ -350,7 +347,6 @@ public class Qlikview {
                     continue; // Skip line on unexpected error
                 }
 
-
                 // Find the matching student and add the module
                 boolean studentFound = false;
                 if (module != null) { // Ensure module was created successfully
@@ -360,7 +356,6 @@ public class Qlikview {
                             modulesAddedCount++;
                             studentFound = true;
                             // Assuming a student ID is unique, we can break after finding the match
-                            // If multiple students could share an ID (unlikely), remove the break
                             break;
                         }
                     }
@@ -371,30 +366,31 @@ public class Qlikview {
                     linesSkippedStudentNotFound++;
                 }
             }
-            DataPipeline.log(logWriter, "INFO", file.getName(), "Finished processing. Added " + modulesAddedCount + " modules. Skipped lines: " + (linesSkippedInvalidBannerID + linesSkippedStudentNotFound + linesSkippedParsingError) + " (Invalid BannerID: " + linesSkippedInvalidBannerID + ", StudentNotFound: " + linesSkippedStudentNotFound + ", ParsingError: " + linesSkippedParsingError + ")");
 
+            DataPipeline.log(logWriter, "INFO", file.getName(), "Successfully updated " + students.size() + " student records.");
+            for (Student student : students) {
+                DataPipeline.log(logWriter, "INFO", file.getName(), "Student ID: " + student.getBannerID() + " Student Name: " + student.getName() + ", Modules Added: " + student.getModules().size());
+            }
         } catch (IOException e) {
-             // Log the exception using a temporary writer if the main one failed or wasn't created
-             try (PrintWriter errorWriter = new PrintWriter(new FileWriter(logFile, true))) {
-                 DataPipeline.log(errorWriter, "ERROR", file.getName(), "IOException occurred while reading module data: " + e.getMessage());
-             } catch (IOException logEx) {
-                 // If logging itself fails, print to stderr as a last resort
-                 System.err.println("Failed to write error log for IOException in addModulesToStudents: " + logEx.getMessage());
-                 e.printStackTrace(); // Print original exception stack trace
-             }
-             throw e; // Re-throw the original exception
+            // Log the exception using a temporary writer if the main one failed or wasn't created
+            try (PrintWriter errorWriter = new PrintWriter(new FileWriter(logFile, true))) {
+                DataPipeline.log(errorWriter, "ERROR", file.getName(), "IOException occurred while reading module data: " + e.getMessage());
+            } catch (IOException logEx) {
+                // If logging itself fails, print to stderr as a last resort
+                System.err.println("Failed to write error log for IOException in addModulesToStudents: " + logEx.getMessage());
+                e.printStackTrace(); // Print original exception stack trace
+            }
+            throw e; // Re-throw the original exception
         } catch (Exception e) {
-             // Catch unexpected runtime exceptions during processing
-             try (PrintWriter errorWriter = new PrintWriter(new FileWriter(logFile, true))) {
-                 DataPipeline.log(errorWriter, "ERROR", file.getName(), "Unexpected error occurred while processing module data: " + e.getMessage());
-             } catch (IOException logEx) {
-                 System.err.println("Failed to write error log for unexpected exception in addModulesToStudents: " + logEx.getMessage());
-                 e.printStackTrace();
-             }
-             // Depending on the desired behavior, you might want to re-throw, wrap, or just log
-             throw new RuntimeException("Unexpected error processing module file " + file.getName(), e);
+            // Catch unexpected runtime exceptions during processing
+            try (PrintWriter errorWriter = new PrintWriter(new FileWriter(logFile, true))) {
+                DataPipeline.log(errorWriter, "ERROR", file.getName(), "Unexpected error occurred while processing module data: " + e.getMessage());
+            } catch (IOException logEx) {
+                System.err.println("Failed to write error log for unexpected exception in addModulesToStudents: " + logEx.getMessage());
+                e.printStackTrace();
+            }
+            // Depending on the desired behavior, you might want to re-throw, wrap, or just log
+            throw new RuntimeException("Unexpected error processing module file " + file.getName(), e);
         }
-        
     }
- 
 }
