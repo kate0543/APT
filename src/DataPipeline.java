@@ -11,14 +11,15 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 
 public class DataPipeline {
-    static Integer threshold = 30; // Example threshold for attendance
-    static List<Student> priorityStudents = new ArrayList<>(); // List to hold student objects
+    public static List<Student> priorityStudents = new ArrayList<>(); // List to hold student objects
+    public static Integer threshold = 30; // Example threshold for attendance
+    public static String baseFolderPath = "";
+    public static String logFolderPath = "";
+
     public static void main(String[] args) {
-        String baseFolderPath = "data/BMT/";
-
-
-        String targetProgrammeCode = "BMT"; // Target programme codes
-        String logFolderPath = getLogFolderPath(targetProgrammeCode); // Get log folder path
+          baseFolderPath = "data/SBMT/";
+        String targetProgrammeCode = "SBMT"; // Target programme codes
+         logFolderPath = getLogFolderPath(targetProgrammeCode); // Get log folder path
         // Prepare log file
     File logDir = new File(logFolderPath);
     if (!logDir.exists()) {
@@ -32,18 +33,18 @@ public class DataPipeline {
                 logWriter.println("Timestamp,Level,File,Message");
                 logWriter.flush();
             }
+            DataPipeline pipeline = new DataPipeline();
 
             // Fetch students
             List<Student> students = new ArrayList<>();
             try {
-                students = StEP.fetchStudents(students, baseFolderPath, targetProgrammeCode );
+                students = StEP.fetchStudents(students, baseFolderPath, targetProgrammeCode,pipeline );
             } catch (java.io.IOException e) {
                 log(logWriter, "ERROR", "DataPipeline.java", "Error fetching students: " + e.getMessage());
                 e.printStackTrace();
                 return;
             }
 
-            DataPipeline pipeline = new DataPipeline();
 
             log(logWriter, "INFO", "DataPipeline.java", "=== Priority Students ===");
             priorityStudents = pipeline.fetchPriorityStudents(students,targetProgrammeCode,"All Reasons");
@@ -275,15 +276,13 @@ public class DataPipeline {
                     String status = component.getComponentStatus();
                     if (deadline != null && deadline.isBefore(currentDate) && (status == null || !status.contains("Submitted"))) {
                         addToPriority = true;
-                        priorityReason.append("Overdue component: ");
-                        // .append(component.getComponentTitle())
-                        // .append(" in module: ")
-                        // .append(module.getModuleTitle())
-                        // .append("; ");
-                        break;
-                    }
+                        priorityReason.append("Overdue component: ")
+                        .append(component.getComponentTitle())
+                        .append(" in module: ")
+                        .append(module.getModuleTitle())
+                        .append("; "); 
+                    } // Check if the component is overdue and not submitted
                 }
-                if (addToPriority) break;
             }
 
             if (addToPriority) {
@@ -318,6 +317,8 @@ public class DataPipeline {
         StringBuilder message = new StringBuilder();
         message.append("StudentName: ").append(studentName)
                .append(", StudentID: ").append(studentId)
+               .append(", StudentProgramme: ").append(studentProgramme)
+               .append(", StudentProgrammeYear: ").append(studentProgrammeYear)
                .append(", PriorityType: ").append(priorityType)
                .append(", CriteriaDetails: ").append(criteria);
 
@@ -512,8 +513,16 @@ public class DataPipeline {
     }
     
     public static String getLogFolderPath(String targetProgramme) {
-        java.nio.file.Path logFolderPath = Paths.get("result", targetProgramme, "log");
-        return logFolderPath.toString().replace("\\", "/");
+        if(!(logFolderPath != null &&!logFolderPath.isEmpty())) {
+ 
+             logFolderPath =  "result/"+targetProgramme+"/log/"; 
+            }
+            else if(!(logFolderPath.contains("result"))){
+                logFolderPath += "result/"+targetProgramme+"/log/"; 
+            }
+
+        return logFolderPath;
+
     }
     
 }
