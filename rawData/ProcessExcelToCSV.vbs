@@ -46,7 +46,6 @@ Function CreateDirectoryPath(path)
             On Error GoTo 0
         End If
     Next
-    
     CreateDirectoryPath = True
 End Function
 
@@ -113,6 +112,14 @@ Function IsProgrammeReport(fileName)
         IsProgrammeReport = False
     End If
 End Function
+' Function to check if the file name contains "Source"
+Function isSourceDocument(fileName)
+    If InStr(1, fileName, "Source", vbTextCompare) > 0 Then
+        isSourceDocument = True
+    Else
+        isSourceDocument = False
+    End If
+End Function
 
 ' Function to modify workbook name (replace Programme with Module)
 Function ModifyWorkbookName(originalName, isProgramme, isFirstTab)
@@ -172,7 +179,14 @@ Sub ProcessExcelFile(file)
     Dim fileProcessed, safeName, isProgramme, wsIndex, modifiedWorkbookName
     fileProcessed = False
     isProgramme = IsProgrammeReport(file.Name)
-    
+    isSource = isSourceDocument(file.Name)
+    ' If this is a Source document, only process the "All Assessments Main Campus" worksheet
+    Dim onlyProcessSheetName
+    If isSource Then
+        onlyProcessSheetName = "All Assessments Main Campus"
+    Else
+        onlyProcessSheetName = ""
+    End If
     On Error Resume Next ' Handle errors gracefully
     ' Open the workbook in read-only mode
     Set xlBook = xlApp.Workbooks.Open(file.Path, , True) ' The third parameter (True) opens the file in read-only mode
