@@ -14,7 +14,7 @@ public class Qlikview {
         List<Student> students = new ArrayList<>(); // List to store all students
 
         try {
-            students = fetchStudents(baseFolderPath, targetProgrammeCode);
+            students = fetchStudents(baseFolderPath, targetProgrammeCode, new DataPipeline()); // Fetch students from Qlikview data
 
             if (!students.isEmpty()) {
                 for (Student student : students) {
@@ -30,9 +30,11 @@ public class Qlikview {
         }
     }
 
-    public static List<Student> fetchStudents(String baseFolderPath, String targetProgrammeCode) throws IOException {
+    public static List<Student> fetchStudents(String baseFolderPath, String targetProgrammeCode, DataPipeline pipeline) throws IOException {
         List<Student> students = new ArrayList<>();
-        String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
+        String logFolderPath = pipeline.getLogFolderPath(targetProgrammeCode);
+        System.out.println("logFolderPath: "+logFolderPath+", baseFolderPath: "+baseFolderPath); 
+
         List<String> targetProgrammeCodesList = List.of(targetProgrammeCode + ".S", targetProgrammeCode + ".F"); // Replace with the actual target programme codes
         for (String code : targetProgrammeCodesList) {
             try {
