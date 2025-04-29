@@ -138,38 +138,84 @@ public class Component {
      * Updates component information based on the raw record.
      */
     public void updateComponentInfo() {
-        if (componentRecord != null) {
-            try {
-                int score = Integer.parseInt(componentRecord.replaceAll("[^\\d]", ""));
+        // Initialize defaults
+        this.componentScore = 0;
+        this.componentPassed = false;
+        this.componentStatus = "Running"; // Default status
+        this.componentRAP = false;
+        this.componentIYR = false;
+        // componentPMC is not determined here, assuming set elsewhere if needed
+
+        if (componentRecord == null || componentRecord.trim().isEmpty()) {
+            // No record information or empty string, keep defaults and return
+            return;
+        }
+
+        // 1. Extract flags from the record
+        boolean isNS = componentRecord.contains("NS");
+        boolean isRAP = componentRecord.contains("R"); // Assuming "R" consistently means RAP
+        boolean isIYR = componentRecord.contains("IYR");
+        boolean isResit = componentRecord.contains("**");
+
+        // Update boolean component flags based on presence
+        this.componentRAP = isRAP;
+        this.componentIYR = isIYR;
+
+        // 2. Try parsing the score
+        boolean scoreParsedSuccessfully = false;
+        try {
+            String digits = componentRecord.replaceAll("[^\\d]", "");
+            if (!digits.isEmpty()) {
+                int score = Integer.parseInt(digits);
                 this.componentScore = score;
-                this.componentPassed = score > 40;
-            } catch (NumberFormatException e) {
-                // Not a number, passed remains false
+                // Use >= 40 for passing, consistent with typical marking schemes
+                this.componentPassed = score >= 40;
+                scoreParsedSuccessfully = true;
+            }
+        } catch (NumberFormatException e) {
+            // Score parsing failed (e.g., record contains only flags like "NS").
+            // Score remains 0, passed remains false.
+            // Optionally log this error: System.err.println("Could not parse score from record: " + componentRecord);
+        }
+
+        // 3. Determine primary Status based on score and flags (prioritizing flags if score is 0 or parsing failed)
+        if (scoreParsedSuccessfully && this.componentScore > 0) {
+            // Score parsed successfully and is positive
+            this.componentStatus = "Submitted";
+        } else {
+            // Score is 0, or parsing failed. Check flags.
+            if (isNS) {
+                this.componentStatus = "NS"; // Not Submitted takes precedence
+            } else if (isRAP) {
+                this.componentStatus = "R"; // RAP
+            } else if (isIYR) {
+                this.componentStatus = "IYR"; // In-Year Retrieval
+            } else if (scoreParsedSuccessfully && this.componentScore == 0) {
+                // Score was parsed as 0, and no NS/R/IYR flags found.
+                // Treat as submitted with a score of 0.
+                this.componentStatus = "Submitted";
+            } else {
+                // No specific flags, score parsing failed (or was empty digits).
+                // Keep the default status "Running".
+                this.componentStatus = "Running";
             }
         }
 
-        // Update componentStatus based on componentRecord
-        if (componentRecord != null) {
-            if (componentRecord.contains("NS")) {
-                componentStatus = "NS";
-            } else if (componentScore== 0) {
-                // No score, not submitted, currently running not failed
-                componentStatus = "Running";
-                this.componentPassed = true;
-            }
-            
-            if (componentRecord.contains("**")) {
-                if (componentStatus == null || componentStatus.isEmpty()) {
-                    componentStatus = "Resit";
-                } else if (!componentStatus.contains("Resit")) {
-                    componentStatus += ",Resit";
+        // 4. Handle Resit flag (Append or replace if necessary)
+        if (isResit) {
+            // Avoid appending if "Resit" is already part of the status string
+            if (!this.componentStatus.contains("Resit")) {
+                if (this.componentStatus.equals("Running")) {
+                    // If the status is currently just the default "Running", replace it entirely.
+                    this.componentStatus = "Resit";
+                } else {
+                    // Append ",Resit" to other determined statuses (e.g., "Submitted,Resit", "NS,Resit").
+                    this.componentStatus += ",Resit";
                 }
             }
-            if (componentPassed) {
-                componentStatus = "Submitted";
-            }
         }
-
+        // Note: The original debug print statement has been removed as part of optimization.
+        // If needed for debugging, uncomment the line below:
         // System.out.println("Component Info Updated: " + this.toString());
     }
 
@@ -179,7 +225,7 @@ public class Component {
      */
     public boolean hasFailed() {
         if (this.componentRecord != null && this.componentRecord.contains("MM")) {
-            return false; // Running component, not failed
+            return true; // Running component, not submitted, failed
         }
         if (this.componentScore != null) {
             return this.componentScore < 40;
