@@ -11,9 +11,9 @@ import java.util.List;
 public class Main {
     private static JFrame frame;
     private static JTextArea logArea;
-    private static JFileChooser folderChooser;
-    private static JTextField programmeField;
+    private static JFileChooser folderChooser; 
     private static JComboBox<String> reasonCombo;
+    private static JComboBox<String> programmeCombo;
     private static JTextField attendanceRateField;
     private static JLabel attendanceThresholdLabel;
     private static JButton generateBtn;
@@ -34,6 +34,8 @@ public class Main {
     static String choosenCiteria = "";
     static DataPipeline pipeline = new DataPipeline();
 
+    // Programme ComboBox setup (editable, with default options)
+ 
     public enum PriorityCriteriaList {
         ALL_REASONS("All Reasons"),
         LOW_ATTENDANCE("Low Attendance"),
@@ -46,6 +48,21 @@ public class Main {
         private final String displayName;
 
         PriorityCriteriaList(String displayName) {
+            this.displayName = displayName;
+        }
+
+        @Override
+        public String toString() {
+            return displayName;
+        }
+    }
+    public enum ProgrammeList {
+        SBMT("SBMT"),
+        LBL("LBL");
+
+        private final String displayName;
+
+        ProgrammeList(String displayName) {
             this.displayName = displayName;
         }
 
@@ -74,10 +91,10 @@ public class Main {
 
         // Components
         JButton chooseRootBtn = new JButton("Choose Root Folder");
-        JButton chooseTargetBtn = new JButton("Choose Target Folder");
-        programmeField = new JTextField(12);
-        programmeField.setToolTipText("Enter Programme Code");
-
+        JButton chooseTargetBtn = new JButton("Choose Target Folder"); 
+        
+        // Initialize programmeField before using it
+        setupProgrammeCombo();
         setupReasonCombo();
         setupAttendanceField();
 
@@ -131,6 +148,24 @@ public class Main {
             } else {
                 choosenCiteria = ""; // Reset if default is selected
                 updateAttendanceFieldVisibility();
+            }
+        });
+    }
+
+    private static void setupProgrammeCombo() {
+        programmeCombo = new JComboBox<>(); 
+        programmeCombo.addItem("Select Programme Code...");
+        for (ProgrammeList programme : ProgrammeList.values()) {
+            programmeCombo.addItem(programme.toString());
+        } 
+        programmeCombo.addActionListener(e -> {
+            Object selected = programmeCombo.getSelectedItem();
+            if (selected != null && !selected.toString().equals("Select Programme Code...")) {
+                // Update targetProgrammeCode based on selected item
+                targetProgrammeCode = selected.toString().trim();
+            }
+            else {
+                targetProgrammeCode = ""; // Reset if default is selected
             }
         });
     }
@@ -201,7 +236,7 @@ public class Main {
         paramGbc.gridx = 1;
         paramGbc.weightx = 1.0;
         paramGbc.fill = GridBagConstraints.HORIZONTAL;
-        paramsPanel.add(programmeField, paramGbc);
+        paramsPanel.add(programmeCombo, paramGbc);
         
         // Reason row
         paramGbc.gridx = 0;
@@ -264,7 +299,7 @@ public class Main {
         exportBtn.addActionListener(e -> handleExportToCsv());
 
         // Reset Button Action
-        resetBtn.addActionListener(e -> handleReset(chooseRootBtn));
+        resetBtn.addActionListener(e -> handleReset(chooseRootBtn, chooseTargetBtn));
     }
     
     private static void handleChooseRoot(JButton chooseRootBtn) {
@@ -296,9 +331,9 @@ public class Main {
             return;
         }
         
-        String programme = programmeField.getText().trim();
+        String programme = programmeCombo.getSelectedItem() != null ? programmeCombo.getSelectedItem().toString().trim() : "";
         if (programme.isEmpty()) {
-            showWrappedMessageDialog("Please enter a programme code.");
+            showWrappedMessageDialog("Please select a programme code.");
             return;
         }
         
@@ -340,7 +375,7 @@ public class Main {
         }
 
         // Get programme from field
-        String programme = programmeField.getText().trim();
+        String programme = programmeCombo.getSelectedItem() != null ? programmeCombo.getSelectedItem().toString().trim() : "";
         
         // Validate attendance threshold if needed
         boolean isAttendanceRelevant = choosenCiteria.equals(PriorityCriteriaList.ALL_REASONS.toString()) || 
@@ -481,18 +516,18 @@ public class Main {
         return value;
     }
     
-    private static void handleReset(JButton chooseRootBtn) {
+    private static void handleReset(JButton chooseRootBtn, JButton chooseTargetBtn) {
         // Reset UI components
         rootFolder = null;
-        programmeField.setText("");
+        programmeCombo.setSelectedIndex(0);
         reasonCombo.setSelectedIndex(0);
         attendanceRateField.setText(String.valueOf(default_attendance_threshold));
         updateAttendanceFieldVisibility(); // Reset visibility
         logArea.setText("");
         chooseRootBtn.setEnabled(true);
+        chooseTargetBtn.setEnabled(true);
         generateBtn.setEnabled(true);
         exportBtn.setEnabled(false);
-
         // Clear data structures
         students.clear();
         priorityStudents.clear();
