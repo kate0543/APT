@@ -13,16 +13,19 @@ public class IYR {
     public static List<Integer> IYR_bannerIDs = new ArrayList<>();
 
     public static void main(String[] args) throws IOException {
-        String baseFolderPath = "data/BMT/";
+        String baseFolderPath = "data/SBMT/";
  
-        String targetProgrammeCode = "BMT";// Replace with the actual target programme codes
+        String targetProgrammeCode = "SBMT";// Replace with the actual target programme codes
         String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
-        List<Student> students = new ArrayList<>();
-        students = SourceDoc.fetchStudents(students, baseFolderPath, targetProgrammeCode);
-        students = fetchStudents(students, baseFolderPath, targetProgrammeCode);
+        List<Student> students = new ArrayList<>(); 
+        students = fetchStudents(students, baseFolderPath, targetProgrammeCode, new DataPipeline()); // Fetch students from Qlikview data
     } 
-        public static List<Student> fetchStudents(List<Student> students, String baseFolderPath, String targetProgrammeCode) {
-            String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
+        public static List<Student> fetchStudents(List<Student> students, String baseFolderPath, String targetProgrammeCode, DataPipeline pipeline) throws IOException {
+            // students = Qlikview.fetchStudents(baseFolderPath, targetProgrammeCode);
+            // students = EBR.fetchStudents(students, baseFolderPath, targetProgrammeCode);
+            students = SourceDoc.fetchStudents(students, baseFolderPath, targetProgrammeCode, pipeline); 
+
+            String logFolderPath = pipeline.getLogFolderPath(targetProgrammeCode);
             List<String> targetProgrammeCodesList = List.of(targetProgrammeCode+".S", targetProgrammeCode+".F"); // Replace with the actual target programme codes
 
             List<File> dataFiles = locateIYRFiles(baseFolderPath+"IYR/",targetProgrammeCode);
@@ -37,31 +40,19 @@ public class IYR {
 
           
         } 
-    public static List<File> locateIYRFiles(String baseFolderPath,String targetProgrammeCode) {
-        System.out.println("Processing IYR data within fetchStudents for path: " + baseFolderPath);
-        String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
-        File folder = new File(baseFolderPath);
+    public static List<File> locateIYRFiles(String baseFolderPath, String targetProgrammeCode) {
         List<File> files = new ArrayList<>();
-        File[] allEntries = folder.listFiles();
-        if (allEntries != null) {
-            System.out.println("Searching for IYR files in: " + folder.getAbsolutePath());
-            for (File entry : allEntries) {
-                // Check if it's a file and the name contains "IYR" and ends with ".csv"
-                if (entry.isFile() && entry.getName().contains("IYR") && entry.getName().toLowerCase().endsWith(".csv")) {
-                    System.out.println("Found matching IYR file: " + entry.getName()); // Print the name of the matching file
-                    files.add(entry);
-                }
-            }
-            if (files.isEmpty()) {
-                 System.out.println("No files matching '*IYR*.csv' found in the directory.");
-            } else {
-                 System.out.println("Finished searching. Found " + files.size() + " IYR file(s).");
+        File folder = new File(baseFolderPath);
+        File[] matchedFiles = folder.listFiles((dir, name) -> name.endsWith(".csv") && name.contains("IYR"));
+        System.out.println("Found " + (matchedFiles != null ? matchedFiles.length : 0) + " IYR CSV files in folder: " + folder.getAbsolutePath());
+        if (matchedFiles != null && matchedFiles.length > 0) {
+            for (File file : matchedFiles) { 
+                files.add(file);
             }
         } else {
-             System.out.println("Warning: Could not list files in directory: " + baseFolderPath + ". It might be empty or an error occurred.");
-             // The files list will remain empty, subsequent code should handle this.
+            System.err.println("No matching IYR CSV files found in folder: " + folder.getAbsolutePath());
         }
-        return files; // Return the list of found files
+        return files;
     }
 
 
@@ -85,8 +76,7 @@ public static List<Student> updateIYRComponents(List<Student> students, String l
     List<Integer> IYR_bannerIDs = new ArrayList<>();
 
     try (PrintWriter logWriter = new PrintWriter(new FileWriter(logFile, true))) {
-        for (File file : files) {
-            System.out.println("Processing " + file.getName());
+        for (File file : files) { 
             DataPipeline.log(logWriter, "INFO", file.getName(), "Processing file: " + file.getPath());
 
             try (BufferedReader br = new BufferedReader(new FileReader(file))) {
@@ -153,7 +143,7 @@ public static List<Student> updateIYRComponents(List<Student> students, String l
                                         if (component.getComponentTitle().equals(componentTitle)) {
                                             component.setComponentIYR(true);
                                             componentUpdated = true;
-                                            DataPipeline.log(logWriter, "INFO", file.getName(), "Set IYR=true for Student " + bannerID + ", CRN " + crn + ", Component '" + componentTitle + "'");
+                                            DataPipeline.log(logWriter, "INFO", file.getName(), "Set IYR=true for Student " + bannerID + " ,"+student.getName()+", CRN " + crn +": "+module.getModuleTitle()+ ", Component '" + componentTitle + "'");
                                         }
                                     }
                                 }
@@ -162,7 +152,7 @@ public static List<Student> updateIYRComponents(List<Student> students, String l
                                 DataPipeline.log(logWriter, "WARN", file.getName(), "No matching module/component found for Student " + bannerID + ", CRN " + crn + ", Component '" + componentTitle + "'");
                             }
                         } else {
-                            DataPipeline.log(logWriter, "WARN", file.getName(), "Student with Banner ID " + bannerID + " not found in the provided student list.");
+                            DataPipeline.log(logWriter, "WARN", file.getName(), "Student with Banner ID " + bannerID + " not found in the provided qlikview student list.");
                         }
                     } catch (NumberFormatException nfe) {
                         DataPipeline.log(logWriter, "ERROR", file.getName(), "Could not parse Banner ID from cleaned string: '" + cleaned + "' (raw: '" + rawID + "'). Line: " + line);
@@ -205,28 +195,25 @@ public static List<Student> updateIYRComponents(List<Student> students, String l
 }
 public static void saveIYRStudentsToFile(List<Student> IYRStudens, String logFolderPath,String filePath) {
     File IYRFile = new File(logFolderPath, filePath);
-    if(!IYRStudens.isEmpty()) {
-        System.out.println(IYRStudens.size() + " students with IYR components found.");
-
- 
+    if (!IYRStudens.isEmpty()) {
         try (PrintWriter writer = new PrintWriter(new FileWriter(IYRFile))) {
             writer.println("Student Name, Banner ID,CRN,Component Title"); // Header
             for (Student student : IYRStudens) {
                 for (Module module : student.getModules()) {
                     for (Component component : module.getComponents()) {
                         if (component.isComponentIYR()) {
-                            writer.println(student.getName()+","+student.getBannerID() + "," + module.getModuleCRN() + "," + component.getComponentTitle());
+                            writer.println(student.toString() + "," + module.getModuleCRN() +","+module.getModuleTitle()+ "," + component.getComponentTitle());
                         }
                     }
                 }
             }
-            System.out.println("IYR students saved to " + IYRFile.getAbsolutePath());
+            DataPipeline.log(writer, "INFO", "IYR_Student_Save", "IYR students saved to " + IYRFile.getAbsolutePath());
         } catch (IOException e) {
-            System.err.println("Error writing to file: " + e.getMessage());
-        }}
-        else {
-            System.out.println("No students with IYR components found.");
+            DataPipeline.log(null, "ERROR", "IYR_Student_Save", "Error writing to file: " + e.getMessage());
         }
+    } else {
+        DataPipeline.log(null, "INFO", "IYR_Student_Save", "No students with IYR components found.");
+    }
     } 
  
     /**
