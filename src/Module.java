@@ -349,6 +349,16 @@ public class Module {
         this.moduleAdminTeam = moduleAdminTeam;
     }
 
+    public boolean componentExists(String componentTitle) {
+        
+        for(Component comp : components) {
+            System.err.println("Component Title: " + comp.getComponentTitle() + ", Input Title: " + componentTitle);
+            if (comp.getComponentTitle().equals(componentTitle)) {
+                return true; // Component found in the list
+            }
+        }
+        return false;
+    }
     // --- Overridden Methods ---
 
     @Override
