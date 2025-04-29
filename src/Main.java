@@ -15,21 +15,24 @@ public class Main {
     private static JTextField programmeField;
     private static JComboBox<String> reasonCombo;
     private static JTextField attendanceRateField;
+    private static JLabel attendanceThresholdLabel;
     private static JButton generateBtn;
     private static JButton exportBtn;
 
     private static File rootFolder;
+    private static File targetFolder;
     private static String priorityString = "";
     private static String targetProgrammeCode = "";
-    private static List<String> targetProgrammeCodesList = new ArrayList<>(); 
-    
+    private static List<String> targetProgrammeCodesList = new ArrayList<>();
+
     // Default attendance threshold
     private static int default_attendance_threshold = 30;
 
     // Made static to be accessed from static main method and lambdas
     static List<Student> students = new ArrayList<>();
-    static List<Student> priorityStudents = new ArrayList<>(); 
-    static String choosenCiteria = ""; 
+    static List<Student> priorityStudents = new ArrayList<>();
+    static String choosenCiteria = "";
+    static DataPipeline pipeline = new DataPipeline();
 
     public enum PriorityCriteriaList {
         ALL_REASONS("All Reasons"),
@@ -57,7 +60,7 @@ public class Main {
             setupUI();
         });
     }
-    
+
     private static void setupUI() {
         frame = new JFrame("Student Priority Group Tool");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -66,11 +69,12 @@ public class Main {
 
         JPanel topPanel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5); // padding between components
+        gbc.insets = new Insets(5, 5, 5, 5); // Padding between components
         gbc.anchor = GridBagConstraints.WEST;
 
         // Components
         JButton chooseRootBtn = new JButton("Choose Root Folder");
+        JButton chooseTargetBtn = new JButton("Choose Target Folder");
         programmeField = new JTextField(12);
         programmeField.setToolTipText("Enter Programme Code");
 
@@ -80,16 +84,16 @@ public class Main {
         JButton loadDataBtn = new JButton("Load Data");
         generateBtn = new JButton("Generate Priority Group");
         generateBtn.setEnabled(true);
-        
+
         // Create Export Button
         exportBtn = new JButton("Export to CSV");
         exportBtn.setEnabled(false); // Initially disabled
-        
+
         // Add Reset Button
         JButton resetBtn = new JButton("Reset");
 
         // Add components to panel
-        addComponentsToPanel(topPanel, gbc, chooseRootBtn, loadDataBtn, generateBtn, resetBtn);
+        addComponentsToPanel(topPanel, gbc, chooseRootBtn, chooseTargetBtn, loadDataBtn, generateBtn, resetBtn);
 
         // Log area
         logArea = new JTextArea();
@@ -104,29 +108,36 @@ public class Main {
         folderChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
 
         // Setup action listeners
-        setupActionListeners(chooseRootBtn, loadDataBtn, generateBtn, exportBtn, resetBtn);
+        setupActionListeners(chooseRootBtn, chooseTargetBtn,loadDataBtn, generateBtn, exportBtn, resetBtn);
+
+        // Set initial visibility of attendance field
+        updateAttendanceFieldVisibility();
 
         frame.setVisible(true);
     }
-    
+
     private static void setupReasonCombo() {
         reasonCombo = new JComboBox<>();
         reasonCombo.addItem("Select Priority Reason...");
         for (PriorityCriteriaList criteria : PriorityCriteriaList.values()) {
             reasonCombo.addItem(criteria.toString());
         }
-        
+
         reasonCombo.addActionListener(e -> {
             Object selectedItem = reasonCombo.getSelectedItem();
             if (selectedItem != null && !selectedItem.toString().equals("Select Priority Reason...")) {
                 choosenCiteria = selectedItem.toString();
+                updateAttendanceFieldVisibility();
             } else {
                 choosenCiteria = ""; // Reset if default is selected
+                updateAttendanceFieldVisibility();
             }
         });
     }
-    
+
     private static void setupAttendanceField() {
+        attendanceThresholdLabel = new JLabel("Attendance Threshold (%):");
+        
         attendanceRateField = new JTextField(5);
         attendanceRateField.setText(String.valueOf(default_attendance_threshold));
         attendanceRateField.setToolTipText("Enter Attendance Rate Threshold (%)");
@@ -135,27 +146,20 @@ public class Main {
             @Override
             public void focusLost(FocusEvent e) {
                 updateAttendanceThreshold();
-                // If threshold is set (not empty and not default), restrict criteria
-                String rateText = attendanceRateField.getText().trim();
-                boolean thresholdEntered = !rateText.isEmpty() && !rateText.equals("0");
-                reasonCombo.removeAllItems();
-                // if (thresholdEntered) {
-                //     reasonCombo.addItem("Select Priority Reason...");
-                //     reasonCombo.addItem(PriorityCriteriaList.ALL_REASONS.toString());
-                //     reasonCombo.addItem(PriorityCriteriaList.LOW_ATTENDANCE.toString());
-                // } else {
-                    reasonCombo.addItem("Select Priority Reason...");
-                    for (PriorityCriteriaList criteria : PriorityCriteriaList.values()) {
-                        reasonCombo.addItem(criteria.toString());
-                    }
-                // }
-                choosenCiteria = "";
             }
         });
     }
     
+    private static void updateAttendanceFieldVisibility() {
+        boolean shouldShow = choosenCiteria.equals(PriorityCriteriaList.ALL_REASONS.toString()) || 
+                            choosenCiteria.equals(PriorityCriteriaList.LOW_ATTENDANCE.toString());
+        
+        attendanceThresholdLabel.setVisible(shouldShow);
+        attendanceRateField.setVisible(shouldShow);
+    }
+    
     private static void addComponentsToPanel(JPanel topPanel, GridBagConstraints gbc, 
-                                        JButton chooseRootBtn, JButton loadDataBtn, 
+                                        JButton chooseRootBtn, JButton chooseTargetBtn, JButton loadDataBtn, 
                                         JButton generateBtn, JButton resetBtn) {
         // Set up panel with some padding and spacing
         topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -169,7 +173,15 @@ public class Main {
         gbc.gridwidth = 4;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         topPanel.add(filePanel, gbc);
+
+        filePanel.add(chooseTargetBtn);
         
+        gbc.gridx = 5;
+        gbc.gridy = 0;
+        gbc.gridwidth = 4;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        topPanel.add(filePanel, gbc);
+
         // Add separator
         gbc.gridy = 1;
         gbc.insets = new Insets(5, 5, 5, 5);
@@ -184,7 +196,7 @@ public class Main {
         // Programme row
         paramGbc.gridx = 0;
         paramGbc.gridy = 0;
-        paramsPanel.add(new JLabel("Programme:"), paramGbc);
+        paramsPanel.add(new JLabel("Programme Code:"), paramGbc);
         
         paramGbc.gridx = 1;
         paramGbc.weightx = 1.0;
@@ -196,7 +208,7 @@ public class Main {
         paramGbc.gridy = 1;
         paramGbc.weightx = 0;
         paramGbc.fill = GridBagConstraints.NONE;
-        paramsPanel.add(new JLabel("Reason:"), paramGbc);
+        paramsPanel.add(new JLabel("Priority Reason:"), paramGbc);
         
         paramGbc.gridx = 1;
         paramGbc.weightx = 1.0;
@@ -208,7 +220,7 @@ public class Main {
         paramGbc.gridy = 2;
         paramGbc.weightx = 0;
         paramGbc.fill = GridBagConstraints.NONE;
-        paramsPanel.add(new JLabel("Attendance Threshold (%):"), paramGbc);
+        paramsPanel.add(attendanceThresholdLabel, paramGbc);
         
         paramGbc.gridx = 1;
         paramGbc.fill = GridBagConstraints.NONE;
@@ -236,11 +248,12 @@ public class Main {
         topPanel.add(buttonPanel, gbc);
     }
     
-    private static void setupActionListeners(JButton chooseRootBtn, JButton loadDataBtn, 
+    private static void setupActionListeners(JButton chooseRootBtn, JButton chooseTargetBtn, JButton loadDataBtn, 
                                           JButton generateBtn, JButton exportBtn, JButton resetBtn) {
         // Choose Root Button Action
         chooseRootBtn.addActionListener(e -> handleChooseRoot(chooseRootBtn));
-        
+        chooseTargetBtn.addActionListener(e -> handleChooseTarget(chooseTargetBtn));
+
         // Load Data Button Action
         loadDataBtn.addActionListener(e -> handleLoadData());
 
@@ -260,7 +273,21 @@ public class Main {
             rootFolder = folderChooser.getSelectedFile();
             logArea.append("Root folder set to: " + rootFolder.getAbsolutePath() + "\n");
             chooseRootBtn.setEnabled(false);
+            pipeline.baseFolderPath= (rootFolder.getAbsolutePath() + "\\").replace("\\", "/");
+            
         }
+        System.out.println(pipeline.baseFolderPath);
+    }
+    private static void handleChooseTarget(JButton chooseTargetBtn) {
+        int result = folderChooser.showOpenDialog(frame);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            targetFolder = folderChooser.getSelectedFile();
+            logArea.append("Target folder set to: " + targetFolder.getAbsolutePath() + "\n");
+            chooseTargetBtn.setEnabled(false);
+            pipeline.logFolderPath= (targetFolder.getAbsolutePath() + "\\").replace("\\", "/");
+        }
+        System.out.println(pipeline.logFolderPath);
+
     }
     
     private static void handleLoadData() {
@@ -281,14 +308,13 @@ public class Main {
             // Update targetProgrammeCode from the input field
             targetProgrammeCode = programme;
             
-            // Generate programme codes list (with S and F suffixes)
-            targetProgrammeCodesList = List.of(programme + ".S", programme + ".F");
+            // Generate programme codes list (with S and F suffixes) 
             
             // Resolve path for program data
             Path baseFolderPath = rootFolder.toPath().resolve(programme);
             
             // Load students from data path
-            students = StEP.fetchStudents(students, baseFolderPath.toString() + "/", targetProgrammeCode);
+            students = StEP.fetchStudents(students, baseFolderPath.toString() + "\\", targetProgrammeCode,pipeline);
             logArea.append("Fetched " + students.size() + " students for programme: " + programme + "\n");
             
             // Enable generate button if students were loaded
@@ -316,8 +342,11 @@ public class Main {
         // Get programme from field
         String programme = programmeField.getText().trim();
         
-        // Validate attendance threshold
-        if (!updateAttendanceThreshold()) {
+        // Validate attendance threshold if needed
+        boolean isAttendanceRelevant = choosenCiteria.equals(PriorityCriteriaList.ALL_REASONS.toString()) || 
+                                    choosenCiteria.equals(PriorityCriteriaList.LOW_ATTENDANCE.toString());
+        
+        if (isAttendanceRelevant && !updateAttendanceThreshold()) {
             return;
         }
 
@@ -333,15 +362,20 @@ public class Main {
             logArea.append("--- Generating Priority Group ---\n");
             logArea.append("Programme: " + (programme.isEmpty() ? "Not specified" : programme) + "\n");
             logArea.append("Selected Reason: " + choosenCiteria + "\n");
-            logArea.append("Attendance Threshold: " + default_attendance_threshold + "%\n");
+            
+            if (isAttendanceRelevant) {
+                logArea.append("Attendance Threshold: " + default_attendance_threshold + "%\n");
+            }
+            
             logArea.append("Using loaded student data (" + students.size() + " students).\n");
 
-            // Create data pipeline and set threshold
-            DataPipeline dataPipeline = new DataPipeline();
-            dataPipeline.threshold = default_attendance_threshold;
-            
+            // Create data pipeline and set threshold 
+            pipeline.threshold = default_attendance_threshold;
+
+            System.out.println("logFolderPath: "+pipeline.baseFolderPath+", baseFolderPath: "+pipeline.logFolderPath); 
+
             // Get priority students
-            priorityStudents = dataPipeline.fetchPriorityStudents(students, targetProgrammeCode, choosenCiteria);
+            priorityStudents = pipeline.fetchPriorityStudents(students, targetProgrammeCode, choosenCiteria);
 
             // Handle results
             if (priorityStudents == null || priorityStudents.isEmpty()) {
@@ -398,7 +432,14 @@ public class Main {
 
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileToSave))) {
                 // Write CSV Header with better field names
-                writer.write("StudentInfo ,Criteria,Attendance Threshold");
+                boolean isAttendanceRelevant = choosenCiteria.equals(PriorityCriteriaList.ALL_REASONS.toString()) || 
+                                            choosenCiteria.equals(PriorityCriteriaList.LOW_ATTENDANCE.toString());
+                
+                String header = "StudentInfo,Criteria";
+                if (isAttendanceRelevant) {
+                    header += ",Attendance Threshold";
+                }
+                writer.write(header);
                 writer.newLine();
 
                 // Write student data
@@ -406,9 +447,12 @@ public class Main {
                     // Using a more robust CSV formatting approach
                     // This assumes Student.toString() returns something like "Smith, John (12345)"
                     String studentInfo = " ["+csvEscape(student.toString())+"]";
-                    String line = studentInfo + "," + 
-                                 csvEscape(choosenCiteria) + "," + 
-                                 default_attendance_threshold;
+                    String line = studentInfo + "," + csvEscape(choosenCiteria);
+                    
+                    if (isAttendanceRelevant) {
+                        line += "," + default_attendance_threshold;
+                    }
+                    
                     writer.write(line);
                     writer.newLine();
                 }
@@ -443,6 +487,7 @@ public class Main {
         programmeField.setText("");
         reasonCombo.setSelectedIndex(0);
         attendanceRateField.setText(String.valueOf(default_attendance_threshold));
+        updateAttendanceFieldVisibility(); // Reset visibility
         logArea.setText("");
         chooseRootBtn.setEnabled(true);
         generateBtn.setEnabled(true);
