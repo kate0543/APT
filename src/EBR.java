@@ -27,8 +27,8 @@ public class EBR {
         List<File> ModuleReports = locateEBRFiles(baseFolderPath + "EBR/", "ModuleReport", targetProgrammeCode);
         // students = Qlikview.fetchStudents(baseFolderPath, targetProgrammeCodesList);
         // students = updateStudentsList(students, addComponentsToStudents(ModuleReports, students));
-        students = Qlikview.fetchStudents(baseFolderPath, targetProgrammeCode);
-        students = fetchStudents(students, baseFolderPath, targetProgrammeCode);
+        students = Qlikview.fetchStudents(baseFolderPath, targetProgrammeCode,  new DataPipeline()); // Fetch students from Qlikview data
+        students = fetchStudents(students, baseFolderPath, targetProgrammeCode, new DataPipeline()); // Fetch students from Qlikview data
 
         for (Student student : students) {
             for (Module module : student.getModules()) {
@@ -49,18 +49,18 @@ public class EBR {
         }
     }
 
-    public static List<Student> fetchStudents(List<Student> students, String baseFolderPath, String targetProgrammeCode) throws IOException {
-        students = fetchStudentsMR(students, baseFolderPath, targetProgrammeCode);
-        students = fetchStudentsPR(students, baseFolderPath, targetProgrammeCode);
+    public static List<Student> fetchStudents(List<Student> students, String baseFolderPath, String targetProgrammeCode,DataPipeline pipeline ) throws IOException {
+        students = fetchStudentsMR(students, baseFolderPath, targetProgrammeCode, pipeline);
+        students = fetchStudentsPR(students, baseFolderPath, targetProgrammeCode, pipeline);
         return students;
     }
 
-    public static List<Student> fetchStudentsMR(List<Student> students, String baseFolderPath, String targetProgrammeCode) throws IOException {
-        String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
+    public static List<Student> fetchStudentsMR(List<Student> students, String baseFolderPath, String targetProgrammeCode,DataPipeline pipeline) throws IOException {
+        String logFolderPath = pipeline.getLogFolderPath(targetProgrammeCode);
 
         List<String> targetProgrammeCodesList = List.of(targetProgrammeCode + ".S", targetProgrammeCode + ".F"); // Replace with the actual target programme codes
 
-        students = Qlikview.fetchStudents(baseFolderPath, targetProgrammeCode);
+        students = Qlikview.fetchStudents(baseFolderPath, targetProgrammeCode,pipeline);
 
         for (String code : targetProgrammeCodesList) {
             try {
@@ -83,8 +83,8 @@ public class EBR {
         return students;
     }
 
-    public static List<Student> fetchStudentsPR(List<Student> students, String baseFolderPath, String targetProgrammeCode) throws IOException {
-        String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
+    public static List<Student> fetchStudentsPR(List<Student> students, String baseFolderPath, String targetProgrammeCode,DataPipeline pipeline) throws IOException {
+        String logFolderPath = pipeline.getLogFolderPath(targetProgrammeCode);
 
         List<String> targetProgrammeCodesList = List.of(targetProgrammeCode + ".S", targetProgrammeCode + ".F");
 
@@ -290,6 +290,9 @@ public class EBR {
         }
     }
 
+    /**
+     * Adds components from CSV files to the corresponding students.
+     */
     public static List<Student> addComponentsToStudents(List<File> csvFiles, String logFolderPath, List<Student> students) {
         List<Student> updatedStudents = students; // List to store updated students
 
@@ -384,40 +387,54 @@ public class EBR {
                                 continue;
                             }
 
-                            if (studentModule.getComponentDetailsLoaded()) {
-                                continue;
-                            }
-
-                            List<Component> components = new ArrayList<>();
-                            for (Map.Entry<Integer, String> entry : componentTitleMap.entrySet()) {
-                                int columnIndex = entry.getKey();
-                                String componentTitle = entry.getValue();
-
-                                if (columnIndex < studentParts.length) {
-                                    String rawRecord = studentParts[columnIndex].trim();
-                                    Component component = new Component(
-                                            moduleCRN,
-                                            moduleID,
-                                            componentTitle,
-                                            rawRecord
-                                    );
-                                    components.add(component);
-                                } else {
-                                    DataPipeline.log(logWriter, "WARNING", csvFile.getName(), "Missing data for component '" + componentTitle +
-                                            "' (column " + columnIndex + ") for student " + bannerId);
-                                    Component component = new Component(moduleCRN, moduleID, componentTitle, "");
-                                    components.add(component);
+                            // Only add components if not already loaded
+                            if (!studentModule.getComponentDetailsLoaded()) {
+                                List<Component> components = new ArrayList<>();
+                                // Build a set of existing component titles for this module
+                                List<Component> existingComponents = studentModule.getComponents();
+                                java.util.Set<String> existingTitles = new java.util.HashSet<>();
+                                for (Component c : existingComponents) {
+                                    if (c.getComponentTitle() != null) {
+                                        existingTitles.add(c.getComponentTitle().trim());
+                                    }
                                 }
-                            }
 
-                            if (!components.isEmpty()) {
-                                studentModule.setComponents(components);
-                                studentModule.setComponentDetailsLoaded(true);
-                                DataPipeline.log(logWriter, "INFO", csvFile.getName(), "Successfully added " + components.size() +
-                                        " components for module " + moduleCRN + ":  " + moduleTitle + " student " + bannerId + ": " + matchingStudent.getName());
+                                for (Map.Entry<Integer, String> entry : componentTitleMap.entrySet()) {
+                                    int columnIndex = entry.getKey();
+                                    String componentTitle = entry.getValue();
+                                    if (existingTitles.contains(componentTitle)) {
+                                        DataPipeline.log(logWriter, "WARNING", csvFile.getName(), "Component already exists for student " + bannerId + ": " + componentTitle);
+                                        continue;
+                                    }
+                                    if (columnIndex < studentParts.length) {
+                                        String rawRecord = studentParts[columnIndex].trim();
+                                        Component component = new Component(
+                                                moduleCRN,
+                                                moduleID,
+                                                componentTitle,
+                                                rawRecord
+                                        );
+                                        components.add(component);
+                                        DataPipeline.log(logWriter, "INFO", csvFile.getName(), "Adding component for student " + bannerId + ": " + componentTitle);
+                                    } else {
+                                        DataPipeline.log(logWriter, "WARNING", csvFile.getName(), "Missing data for component '" + componentTitle +
+                                                "' (column " + columnIndex + ") for student " + bannerId);
+                                    }
+                                }
+
+                                if (!components.isEmpty()) {
+                                    // Add new components to existing list, not replace
+                                    existingComponents.addAll(components);
+                                    studentModule.setComponents(existingComponents);
+                                    studentModule.setComponentDetailsLoaded(true);
+                                    DataPipeline.log(logWriter, "INFO", csvFile.getName(), "Successfully added " + components.size() +
+                                            " components for module " + moduleCRN + ":  " + moduleTitle + " student " + bannerId + ": " + matchingStudent.getName());
+                                } else {
+                                    DataPipeline.log(logWriter, "INFO", csvFile.getName(), "No components were added for module " +
+                                            moduleCRN + " student " + bannerId + " " + matchingStudent.getName());
+                                }
                             } else {
-                                DataPipeline.log(logWriter, "INFO", csvFile.getName(), "No components were added for module " +
-                                        moduleCRN + " student " + bannerId + " " + matchingStudent.getName());
+                                DataPipeline.log(logWriter, "INFO", csvFile.getName(), "Component details already loaded for student " + bannerId + " module " + moduleCRN);
                             }
                         }
                     } else {
