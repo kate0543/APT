@@ -1,161 +1,244 @@
-# APT - Academic Progress Tracking
+# Student Priority Group Tool
 
-Welcome to the APT project! This repository contains tools designed to process student and module data, primarily from Qlikview exports, Exam Board Reporter (EBR) files, additional source documents, and In-Year Retrieval (IYR) files, to aid in academic progress tracking and student support prioritization at Salford Business School.
+## Description
+
+This is a Java application designed to identify students who fall into specific "priority groups" based on various academic and administrative criteria. It features a graphical user interface (GUI) built with Swing for ease of use, allowing users to load student data, select criteria, and generate reports. It also includes helper scripts for preparing raw Excel data.
 
 ## Features
 
--   Reads and parses student programme and module enrolment data from Qlikview CSV files.
--   Reads and parses module component results and programme-level module records from EBR CSV files (Module Reports and Programme Reports).
--   Reads and parses additional module/component details (e.g., deadlines, module leaders, component codes) from designated "Source" CSV files.
--   Associates modules and components with the corresponding students based on Banner ID.
--   Identifies students based on specific programme codes.
--   Merges data from Qlikview, EBR, and Source documents for a comprehensive view via the `StEP` class.
--   Provides a structure for analyzing student progression (e.g., identifying failed components, trailing modules).
--   Includes verification steps, such as comparing component counts between EBR and Source data.
--   **NEW:** Identifies "priority" students based on configurable criteria (e.g., failed components, overdue assignments, attendance, registration status) using `DataPipeline.java`.
--   **NEW:** Specifically flags students with overdue, unsubmitted components.
--   **NEW:** Processes 'In Year Retrieval' (IYR) data from specific CSV files to flag relevant components using `IYR.java`.
+*   **Graphical User Interface:** Provides an intuitive interface ([`src.Main`](src/Main.java)) for selecting data folders, programmes, and priority criteria.
+*   **Multiple Priority Criteria:** Supports identifying students based on:
+    *   Low Attendance ([`src.DataPipeline.isLowAttendance`](src/DataPipeline.java))
+    *   New Registration Status ([`src.DataPipeline.isNewRegistration`](src/DataPipeline.java))
+    *   Trailing Modules ([`src.DataPipeline.hasTrailingModules`](src/DataPipeline.java))
+    *   Failed Components ([`src.DataPipeline.hasFailedComponents`](src/DataPipeline.java))
+    *   Programme Registration Status Not 'RE' ([`src.DataPipeline.isProgrammeRegStatusNotRE`](src/DataPipeline.java))
+    *   Module Enrollment Status Not 'RE' ([`src.DataPipeline.hasModuleEnrollmentNotRE`](src/DataPipeline.java))
+    *   Overdue Components ([`src.DataPipeline.hasOverdueComponents`](src/DataPipeline.java))
+    *   All Reasons combined ([`src.DataPipeline.calculatePriorityGroup`](src/DataPipeline.java))
+*   **Configurable Thresholds:** Allows setting a custom attendance percentage threshold ([`src.Main.attendanceRateField`](src/Main.java)).
+*   **Data Loading:** Fetches student data based on selected programme code from a specified root folder (using [`src.StEP.fetchStudents`](src/StEP.java) - *Note: `StEP.java` details are assumed*).
+*   **Logging:** Generates detailed logs for data processing and priority group identification, saved to separate CSV files per priority type ([`src.DataPipeline.logPriorityStudent`](src/DataPipeline.java), [`src.DataPipeline.getLogFolderPath`](src/DataPipeline.java)).
+*   **CSV Export:** Allows exporting the list of identified priority students to a CSV file ([`src.Main.handleExportToCsv`](src/Main.java)).
+*   **Data Preparation Scripts:** Includes VBScripts to help preprocess raw Excel files.
 
-## Getting Started
+## Prerequisites
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/your-username/APT.git
+*   Java Development Kit (JDK) 8 or later.
+*   Microsoft Excel installed (for running the VBScript helper scripts).
+*   The Apache POI libraries included in the `lib/` directory (for the Java application).
+
+## Setup
+
+1.  Ensure you have a compatible JDK installed and configured.
+2.  Ensure Microsoft Excel is installed.
+3.  Compile the Java source code. You can typically do this in an IDE or via the command line:
+    ```sh
+    # Navigate to the project's root directory
+    # Adjust classpath separator (';' for Windows, ':' for Linux/macOS) if needed
+    javac -d bin -cp "lib/*" src/*.java
     ```
-2.  **Navigate to the project directory:**
-    ```bash
-    cd APT
+
+## Data Preparation (Using Helper Scripts)
+
+The `rawData` folder contains VBScripts to help convert and organize raw Excel reports into the CSV format expected by the Java application.
+
+**Important:** These scripts require Microsoft Excel to be installed on your Windows machine.
+
+1.  **`RenameProgrammeReportWB.vbs`:**
+    *   **Purpose:** Renames Excel files located specifically in the `rawData/SBMT/EBR` folder based on content within the first sheet (Programme Code, Term Year, Level Year). It standardizes filenames to `ProgrammeReport-<ProgrammeCode>-<TermYear>-<LevelYear>.xlsx`.
+    *   **Placement:** Place this script inside the `rawData` folder. It is hardcoded to look for files within its `SBMT/EBR` subdirectory.
+    *   **Usage:** Navigate to the `rawData` folder and double-click the script or run it from the command line:
+        ```cmd
+        cscript RenameProgrammeReportWB.vbs
+        ```
+    *   **Note:** Review the script's output for any skipped files or errors.
+
+2.  **`ProcessExcelToCSV.vbs`:**
+    *   **Purpose:** Recursively scans the folder it's placed in (and its subfolders) for `.xlsx` files. It converts each worksheet into a separate CSV file, performing data cleaning (removing quotes, commas, line breaks). It handles "ProgrammeReport" files specially by renaming subsequent sheets to "Module". Skips temporary files and sheets containing errors like "Report could not be retrieved".
+    *   **Placement:** Place this script inside the `rawData` folder (or the specific parent folder containing the Excel files you want to process).
+    *   **Output:** Creates a `Data` folder at the same level as the script's parent folder (e.g., if the script is in `rawData`, it creates `../Data`). The CSV files are saved within this `Data` folder, mirroring the subfolder structure of the source Excel files.
+    *   **Usage:** Navigate to the folder containing the script and double-click it or run from the command line:
+        ```cmd
+        cscript ProcessExcelToCSV.vbs
+        ```
+    *   **Note:** This script will overwrite existing CSV files if run multiple times without clearing the `Data` folder first. It forcefully closes any running Excel instances upon completion.
+
+## Usage (Java Application)
+
+1.  **Prepare Data:**
+    *   Use the helper scripts (`RenameProgrammeReportWB.vbs`, `ProcessExcelToCSV.vbs`) to convert your raw Excel files into the required CSV format within the `Data` folder.
+    *   Ensure the `Data` folder contains subdirectories named after the programme codes (e.g., `Data/SBMT/`, `Data/LBL/`) containing the generated CSV files.
+2.  **Run the Application:**
+    ```sh
+    # Adjust classpath separator (';' for Windows, ':' for Linux/macOS) if needed
+    java -cp "bin;lib/*" src.Main
     ```
-3.  **Prepare Data:**
-    -   Ensure your Qlikview, EBR, and Source CSV files are placed in the appropriate subdirectories within `data/BMT/` (e.g., `data/BMT/Qlikview/`, `data/BMT/EBR/`, `data/BMT/Source/`). Update the `baseFolderPath` in relevant Java files (`StEP.java`, `DataPipeline.java`, `IYR.java`) if using a different base location.
-    -   Ensure any In-Year Retrieval (IYR) CSV files (e.g., `*IYR*.csv`) are placed directly within the `baseFolderPath` (e.g., `data/BMT/`).
-    -   Files should follow the naming conventions expected by the respective processing classes (`StEP.java`, `Qlikview.java`, `EBR.java`, `SourceDoc.java`, `IYR.java`). Refer to the source code of these classes for specific naming patterns and expected file locations.
-4.  **Compile the Java code:**
-    ```bash
-    # Assuming source files are in a 'src' directory and output to 'bin'
-    javac -d bin src/*.java
-    ```
-5.  **Run the application:**
-    You can run different pipelines depending on your needs. To run the priority student identification pipeline (which may include IYR processing depending on implementation):
-    ```bash
-    # Example: Run the priority pipeline via DataPipeline
-    java -cp bin src.DataPipeline
-    ```
-    *Note: Modify the `targetProgrammeCodesList` and `baseFolderPath` within the relevant Java files (`StEP.java`, `DataPipeline.java`, `IYR.java`) to specify which programmes and data locations to process.*
-    *Note: The `IYR.java` class also contains a `main` method, likely for testing IYR processing independently.*
+3.  **Using the GUI ([`src.Main`](src/Main.java)):**
+    *   **Choose Root Folder:** Select the `Data` directory created by the `ProcessExcelToCSV.vbs` script.
+    *   **Choose Target Folder:** Select the directory where log files and exported CSVs should be saved (defaults towards `result/`).
+    *   **Programme Code:** Select the specific programme (e.g., `SBMT`) to process from the dropdown ([`src.Main.programmeCombo`](src/Main.java)). The application expects CSV files within the corresponding subfolder in the Root Folder (e.g., `Data/SBMT/`).
+    *   **Priority Reason:** Select the desired criteria from the dropdown ([`src.Main.reasonCombo`](src/Main.java)).
+    *   **Attendance Threshold (%):** If "Low Attendance" or "All Reasons" is selected, this field ([`src.Main.attendanceRateField`](src/Main.java)) becomes active. Enter the threshold percentage (default is 30).
+    *   **Load Data:** Click to load student data for the selected programme from the CSV files using [`src.StEP.fetchStudents`](src/StEP.java). Status messages appear in the log area.
+    *   **Generate Priority Group:** After loading data, click this to process students based on the selected criteria using [`src.DataPipeline.fetchPriorityStudents`](src/DataPipeline.java). Results are shown in the log area.
+    *   **Export to CSV:** If priority students were found, click this button ([`src.Main.exportBtn`](src/Main.java)) to save the list to a CSV file.
+    *   **Reset:** Clears selections, data, and log messages.
 
-## Contributing
+4.  **Output:**
+    *   Log files are generated in the specified target folder under `<Target Folder>/<ProgrammeCode>/log/` (e.g., `result/SBMT/log/`). Separate logs like `priority_student_list_LowAttendance.csv` are created.
+    *   Exported CSV files are saved to the location chosen via the "Save" dialog.
 
-We welcome contributions! Please read our [contributing guidelines](CONTRIBUTING.md) before submitting a pull request.
+## Project Structure
 
-## Project Background
-
-The APT project was developed at Salford Business School, University of Salford, to provide a tool for processing and analyzing student academic data derived from Qlikview exports, Exam Board Reporter (EBR) files, IYR files, and other source documents. It aims to simplify the tracking of student progression, module enrolment, component-level results including deadlines, and to help identify students who may require additional support or are subject to specific processes like In-Year Retrieval.
-
-## Classes and Usage
-
-### Core Classes
-
--   **`StEP.java`** (Student Engagement Platform - Assumed): Acts as the primary data fetching and integration class. It likely orchestrates calls to fetch data from Qlikview, EBR, and Source documents, consolidating them into `Student`, `Module`, and `Component` objects. Called by `DataPipeline.java`.
--   **`DataPipeline.java`**: Provides a workflow specifically focused on identifying "priority" students. It calls `StEP.fetchStudents` to get the consolidated data and then applies logic (`calculatePriorityGroup`, `priorityUpdateComponent`) to flag students based on criteria like failed components or overdue assignments. May also incorporate IYR data processing by calling methods from `IYR.java`. Can serve as a main entry point for this specific analysis.
--   **`Qlikview.java`**: Reads and parses initial student and module enrolment data from Qlikview CSV exports. Creates `Student` and `Module` objects. Likely called by `StEP.java`.
--   **`EBR.java`**: Processes Exam Board Reporter (EBR) CSV files (`ModuleReport` and `ProgrammeReport`). Parses component details and module records. Likely called by `StEP.java`.
--   **`SourceDoc.java`**: Reads additional details (deadlines, codes, leaders) from "Source" CSV files and merges them. Performs verification checks. Likely called by `StEP.java`.
--   **`IYR.java`**: Reads 'In Year Retrieval' (IYR) CSV files located in the base data folder (files containing "IYR" and ending in `.csv`). Identifies students and components mentioned in these files and sets an `isComponentIYR` flag on the corresponding `Component` objects. Provides methods to locate IYR files (`locateIYRFiles`) and update student data (`updateIYRComponents`).
--   **`Student.java`**: Represents a student, holding details like Banner ID, name, programme code, registration status, residency, and a list of associated `Module` objects. Includes logic (`checkTrailingModules`, `checkFailedComponents`, `getFailedComponents`) and attributes (`priorityReasons`) related to progression and priority status. Includes methods like `updateReason` and `getPriorityReasons`.
--   **`Module.java`**: Represents a module, containing information such as CRN, module ID, title, year, level, credits, registration status, module leader, module admin team, and a list of associated `Component` objects.
--   **`Component.java`**: Represents a module component (e.g., an assessment). Holds details like title, code, type, weight, student's mark/status, submission deadline, and a flag (`componentIYR`) indicating if it's subject to In Year Retrieval. Includes logic (`hasFailed`, `getComponentDeadline`, `getComponentStatus`) relevant to priority checks.
-
-### Input Data Format
-
-The application expects CSV files in specific structures, processed by the relevant classes:
-
--   **Qlikview Data:**
-    -   **Location:** `data/BMT/Qlikview/` (configurable).
-    -   **Content:** Student demographics, programme registration, module enrolment.
-    -   **Processed by:** `Qlikview.java` (likely via `StEP.java`).
--   **EBR Data:**
-    -   **Location:** `data/BMT/EBR/` (configurable).
-    -   **Content:** Module Report (component results), Programme Report (overall module records).
-    -   **Processed by:** `EBR.java` (likely via `StEP.java`).
--   **Source Data:**
-    -   **Location:** `data/BMT/Source/` (configurable).
-    -   **Content:** Component deadlines, codes, module leaders, admin teams.
-    -   **Processed by:** `SourceDoc.java` (likely via `StEP.java`).
--   **IYR Data:**
-    -   **Location:** `data/BMT/` (configurable `baseFolderPath`). Files must contain "IYR" in the name and end with `.csv`.
-    -   **Content:** Expected to contain at least Banner ID, Module CRN, and Component Title to identify components for IYR flagging.
-    -   **Processed by:** `IYR.java`.
-
-Refer to the respective classes for detailed format and naming convention requirements.
-
-### Usage
-
-1.  Configure the `baseFolderPath` and `targetProgrammeCodesList` variables in `src/StEP.java`, `src/DataPipeline.java`, and potentially `src/IYR.java` as needed.
-2.  Place the corresponding Qlikview, EBR, Source, and IYR CSV data files in the correct directory structures (e.g., `data/BMT/Qlikview/`, `data/BMT/EBR/`, `data/BMT/Source/`, `data/BMT/`).
-3.  Compile the Java source files (`javac -d bin src/*.java`).
-4.  Run the desired main processing class. For priority student analysis:
-    ```bash
-    java -cp bin src.DataPipeline
-    ```
-    The processing order for this pipeline is generally:
-    a.  `DataPipeline.main` is executed.
-    b.  `StEP.fetchStudents` is called, which internally fetches and merges data from Qlikview, EBR, and Source files into a list of `Student` objects.
-    c.  (Optional/Integrated) IYR data may be processed by calling `IYR.updateIYRComponents`.
-    d.  `DataPipeline.fetchPriorityStudents` identifies students meeting general priority criteria using `calculatePriorityGroup`.
-    e.  `DataPipeline.priorityUpdateComponent` identifies students with overdue components.
-    f.  Results (lists of priority students, potentially including IYR status) are printed to the console.
-5.  The program will process the files and print status messages, verification warnings, and the priority analysis results to the console.
-
-Example snippet from `DataPipeline.java` showing the priority pipeline orchestration:
-
-```java
-// Inside the main method of DataPipeline.java
-String baseFolderPath = "data/BMT/";
-List<String> targetProgrammeCodesList = List.of("BMT.S", "BMT.F"); // Target programme codes
-
-// Fetch students using StEP (which handles Qlikview, EBR, Source integration)
-List<Student> students = new ArrayList<>();
-try {
-    students = StEP.fetchStudents(students, baseFolderPath, targetProgrammeCodesList);
-} catch (java.io.IOException e) {
-    // ... error handling ...
-}
-
-// Locate and process IYR files (Example integration point)
-try {
-    List<File> iyrFiles = IYR.locateIYRFiles(baseFolderPath);
-    students = IYR.updateIYRComponents(students, iyrFiles);
-    System.out.println("IYR component update complete.");
-} catch (Exception e) {
-    System.err.println("Error processing IYR files: " + e.getMessage());
-    // Decide if processing should continue or halt
-}
-
-
-DataPipeline pipeline = new DataPipeline();
-
-// Identify and print general priority students
-System.out.println("=== Priority Students ===");
-priorityStudents = pipeline.fetchPriorityStudents(students);
-// ... printing logic ...
-
-// Identify and print priority students with overdue components
-System.out.println("\n=== Priority Students with Overdue Components ===");
-List<Student> overduePriority = pipeline.priorityUpdateComponent(students);
-// ... printing logic ...
-
-// Example: Print students with IYR components (using IYR helper method)
-System.out.println("\n=== Students with IYR Components ===");
-List<Student> iyrStudents = IYR.getStudentsWithIYR(students);
-// ... printing logic ...
+```
+.
+├── rawData/            # Folder for raw Excel files and helper scripts
+│   ├── SBMT/
+│   │   └── EBR/        # Location for files processed by RenameProgrammeReportWB.vbs
+│   ├── LBL/
+│   ├── ProcessExcelToCSV.vbs
+│   └── RenameProgrammeReportWB.vbs
+├── Data/               # Processed CSV data folder (output of ProcessExcelToCSV.vbs)
+│   ├── LBL/
+│   └── SBMT/
+│       └── EBR/
+├── lib/                # Required JAR libraries (Apache POI)
+├── result/             # Default output folder for logs and exports
+│   └── SBMT/
+│       └── log/
+├── src/                # Java source files (Main.java, DataPipeline.java, etc.)
+├── bin/                # Compiled .class files (output of compilation)
+├── pom.xml             # Maven Project Object Model (if used)
+└── README.md           # This file
 ```
 
-## Author
+## Dependencies
 
-This project was created and is maintained by Dr. Kate Han, Salford Business School, University of Salford. For inquiries, please contact Dr. Han at [k.han3@salford.ac.uk](mailto:k.han3@salford.ac.uk).
+*   **Java Application:**
+    *   Apache POI: Used for handling Microsoft Office formats (likely Excel for data input/output, based on library presence). Found in the `lib/` directory.
+*   **Helper Scripts:**
+    *   Microsoft Windows
+    *   Microsoft Excel
+```# Student Priority Group Tool
 
-## License
+## Description
 
-This project is licensed under the MIT License. Copyright is held by Salford Business School, University of Salford.
+This is a Java application designed to identify students who fall into specific "priority groups" based on various academic and administrative criteria. It features a graphical user interface (GUI) built with Swing for ease of use, allowing users to load student data, select criteria, and generate reports. It also includes helper scripts for preparing raw Excel data.
 
+## Features
+
+*   **Graphical User Interface:** Provides an intuitive interface ([`src.Main`](src/Main.java)) for selecting data folders, programmes, and priority criteria.
+*   **Multiple Priority Criteria:** Supports identifying students based on:
+    *   Low Attendance ([`src.DataPipeline.isLowAttendance`](src/DataPipeline.java))
+    *   New Registration Status ([`src.DataPipeline.isNewRegistration`](src/DataPipeline.java))
+    *   Trailing Modules ([`src.DataPipeline.hasTrailingModules`](src/DataPipeline.java))
+    *   Failed Components ([`src.DataPipeline.hasFailedComponents`](src/DataPipeline.java))
+    *   Programme Registration Status Not 'RE' ([`src.DataPipeline.isProgrammeRegStatusNotRE`](src/DataPipeline.java))
+    *   Module Enrollment Status Not 'RE' ([`src.DataPipeline.hasModuleEnrollmentNotRE`](src/DataPipeline.java))
+    *   Overdue Components ([`src.DataPipeline.hasOverdueComponents`](src/DataPipeline.java))
+    *   All Reasons combined ([`src.DataPipeline.calculatePriorityGroup`](src/DataPipeline.java))
+*   **Configurable Thresholds:** Allows setting a custom attendance percentage threshold ([`src.Main.attendanceRateField`](src/Main.java)).
+*   **Data Loading:** Fetches student data based on selected programme code from a specified root folder (using [`src.StEP.fetchStudents`](src/StEP.java) - *Note: `StEP.java` details are assumed*).
+*   **Logging:** Generates detailed logs for data processing and priority group identification, saved to separate CSV files per priority type ([`src.DataPipeline.logPriorityStudent`](src/DataPipeline.java), [`src.DataPipeline.getLogFolderPath`](src/DataPipeline.java)).
+*   **CSV Export:** Allows exporting the list of identified priority students to a CSV file ([`src.Main.handleExportToCsv`](src/Main.java)).
+*   **Data Preparation Scripts:** Includes VBScripts to help preprocess raw Excel files.
+
+## Prerequisites
+
+*   Java Development Kit (JDK) 8 or later.
+*   Microsoft Excel installed (for running the VBScript helper scripts).
+*   The Apache POI libraries included in the `lib/` directory (for the Java application).
+
+## Setup
+
+1.  Ensure you have a compatible JDK installed and configured.
+2.  Ensure Microsoft Excel is installed.
+3.  Compile the Java source code. You can typically do this in an IDE or via the command line:
+    ```sh
+    # Navigate to the project's root directory
+    # Adjust classpath separator (';' for Windows, ':' for Linux/macOS) if needed
+    javac -d bin -cp "lib/*" src/*.java
+    ```
+
+## Data Preparation (Using Helper Scripts)
+
+The `rawData` folder contains VBScripts to help convert and organize raw Excel reports into the CSV format expected by the Java application.
+
+**Important:** These scripts require Microsoft Excel to be installed on your Windows machine.
+
+1.  **`RenameProgrammeReportWB.vbs`:**
+    *   **Purpose:** Renames Excel files located specifically in the `rawData/SBMT/EBR` folder based on content within the first sheet (Programme Code, Term Year, Level Year). It standardizes filenames to `ProgrammeReport-<ProgrammeCode>-<TermYear>-<LevelYear>.xlsx`.
+    *   **Placement:** Place this script inside the `rawData` folder. It is hardcoded to look for files within its `SBMT/EBR` subdirectory.
+    *   **Usage:** Navigate to the `rawData` folder and double-click the script or run it from the command line:
+        ```cmd
+        cscript RenameProgrammeReportWB.vbs
+        ```
+    *   **Note:** Review the script's output for any skipped files or errors.
+
+2.  **`ProcessExcelToCSV.vbs`:**
+    *   **Purpose:** Recursively scans the folder it's placed in (and its subfolders) for `.xlsx` files. It converts each worksheet into a separate CSV file, performing data cleaning (removing quotes, commas, line breaks). It handles "ProgrammeReport" files specially by renaming subsequent sheets to "Module". Skips temporary files and sheets containing errors like "Report could not be retrieved".
+    *   **Placement:** Place this script inside the `rawData` folder (or the specific parent folder containing the Excel files you want to process).
+    *   **Output:** Creates a `Data` folder at the same level as the script's parent folder (e.g., if the script is in `rawData`, it creates `../Data`). The CSV files are saved within this `Data` folder, mirroring the subfolder structure of the source Excel files.
+    *   **Usage:** Navigate to the folder containing the script and double-click it or run from the command line:
+        ```cmd
+        cscript ProcessExcelToCSV.vbs
+        ```
+    *   **Note:** This script will overwrite existing CSV files if run multiple times without clearing the `Data` folder first. It forcefully closes any running Excel instances upon completion.
+
+## Usage (Java Application)
+
+1.  **Prepare Data:**
+    *   Use the helper scripts (`RenameProgrammeReportWB.vbs`, `ProcessExcelToCSV.vbs`) to convert your raw Excel files into the required CSV format within the `Data` folder.
+    *   Ensure the `Data` folder contains subdirectories named after the programme codes (e.g., `Data/SBMT/`, `Data/LBL/`) containing the generated CSV files.
+2.  **Run the Application:**
+    ```sh
+    # Adjust classpath separator (';' for Windows, ':' for Linux/macOS) if needed
+    java -cp "bin;lib/*" src.Main
+    ```
+3.  **Using the GUI ([`src.Main`](src/Main.java)):**
+    *   **Choose Root Folder:** Select the `Data` directory created by the `ProcessExcelToCSV.vbs` script.
+    *   **Choose Target Folder:** Select the directory where log files and exported CSVs should be saved (defaults towards `result/`).
+    *   **Programme Code:** Select the specific programme (e.g., `SBMT`) to process from the dropdown ([`src.Main.programmeCombo`](src/Main.java)). The application expects CSV files within the corresponding subfolder in the Root Folder (e.g., `Data/SBMT/`).
+    *   **Priority Reason:** Select the desired criteria from the dropdown ([`src.Main.reasonCombo`](src/Main.java)).
+    *   **Attendance Threshold (%):** If "Low Attendance" or "All Reasons" is selected, this field ([`src.Main.attendanceRateField`](src/Main.java)) becomes active. Enter the threshold percentage (default is 30).
+    *   **Load Data:** Click to load student data for the selected programme from the CSV files using [`src.StEP.fetchStudents`](src/StEP.java). Status messages appear in the log area.
+    *   **Generate Priority Group:** After loading data, click this to process students based on the selected criteria using [`src.DataPipeline.fetchPriorityStudents`](src/DataPipeline.java). Results are shown in the log area.
+    *   **Export to CSV:** If priority students were found, click this button ([`src.Main.exportBtn`](src/Main.java)) to save the list to a CSV file.
+    *   **Reset:** Clears selections, data, and log messages.
+
+4.  **Output:**
+    *   Log files are generated in the specified target folder under `<Target Folder>/<ProgrammeCode>/log/` (e.g., `result/SBMT/log/`). Separate logs like `priority_student_list_LowAttendance.csv` are created.
+    *   Exported CSV files are saved to the location chosen via the "Save" dialog.
+
+## Project Structure
+
+```
+.
+├── rawData/            # Folder for raw Excel files and helper scripts
+│   ├── SBMT/
+│   │   └── EBR/        # Location for files processed by RenameProgrammeReportWB.vbs
+│   ├── LBL/
+│   ├── ProcessExcelToCSV.vbs
+│   └── RenameProgrammeReportWB.vbs
+├── Data/               # Processed CSV data folder (output of ProcessExcelToCSV.vbs)
+│   ├── LBL/
+│   └── SBMT/
+│       └── EBR/
+├── lib/                # Required JAR libraries (Apache POI)
+├── result/             # Default output folder for logs and exports
+│   └── SBMT/
+│       └── log/
+├── src/                # Java source files (Main.java, DataPipeline.java, etc.)
+├── bin/                # Compiled .class files (output of compilation)
+├── pom.xml             # Maven Project Object Model (if used)
+└── README.md           # This file
+```
+
+## Dependencies
+
+*   **Java Application:**
+    *   Apache POI: Used for handling Microsoft Office formats (likely Excel for data input/output, based on library presence). Found in the `lib/` directory.
+*   **Helper Scripts:**
+    *   Microsoft Windows
+    *   Microsoft Excel
