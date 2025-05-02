@@ -30,10 +30,7 @@ For Each file In folder.Files
         ' First pass to find Programme Code and Level
         For row = 1 To maxRows
             For col = 1 To maxCols
-                cellValue = Trim(CStr(worksheet.Cells(row, col).Value))
-                ' If cellValue <> "" Then 
-                '     WScript.Echo "Row " & row & ", Col " & col & ": " & cellValue
-                ' End If
+                cellValue = Trim(CStr(worksheet.Cells(row, col).Value)) 
 
                 ' Find Programme Code (LB/L/F or similar)
                 If col = 2 And row >= 4 And row <= 6 Then
@@ -41,8 +38,7 @@ For Each file In folder.Files
                         ' Convert something like "LB/L/F" to "LBL.F"
                         parts = Split(cellValue, "/")
                         If UBound(parts) >= 2 Then
-                            programmeCode = Replace(parts(0), " ", "") & parts(1) & "." & parts(2)
-                            ' WScript.Echo "Found programmeCode: " & programmeCode
+                            programmeCode = Replace(parts(0), " ", "") & parts(1) & "." & parts(2) 
                         End If
                     End If
                 End If
@@ -55,8 +51,7 @@ For Each file In folder.Files
                         yearEnd = Mid(termCode, 3, 2)
                         ' Calculate previous year (e.g., "21" from "22")
                         yearStart = Right("0" & CStr(CInt(yearEnd) - 1), 2)  ' Ensure 2 digits with leading zero
-                        termYear = yearStart & "-" & yearEnd
-                        ' WScript.Echo "Parsed termYear: " & termCode & " -> " & termYear
+                        termYear = yearStart & "-" & yearEnd 
                     End If
                 End If
 
@@ -80,10 +75,10 @@ For Each file In folder.Files
             ' Check if target file already exists before renaming
             If fso.FileExists(newPath) Then
                 ' WScript.Echo "Warning: Target file already exists: " & newName
-                WScript.Echo "Skipping rename operation for: " & file.Name
+                ' WScript.Echo "Skipping rename operation for: " & file.Name
             Else
                 fso.MoveFile file.Path, newPath
-                ' WScript.Echo "Renamed to: " & newName
+                WScript.Echo "Renamed to: " & newName
             End If
         Else
             workbook.Close False
@@ -96,3 +91,5 @@ Next
 excel.Quit
 Set excel = Nothing
 Set fso = Nothing
+
+MsgBox "All ProgrammeReport workbook has been renamed with programme code, term year and level year."
