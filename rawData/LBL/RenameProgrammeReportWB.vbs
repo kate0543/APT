@@ -13,10 +13,10 @@ Set folder = fso.GetFolder(fso.BuildPath(fso.GetParentFolderName(WScript.ScriptF
 WScript.Echo "Rename ProgrammeReportWB.vbs started."
 
 WScript.Echo "Processing folder: " & folder.Path
+WScript.Echo "Total files found in folder: " & folder.Files.Count
 
 For Each file In folder.Files
-    If LCase(fso.GetExtensionName(file.Name)) = "xlsx" Then
-        ' WScript.Echo "Checking file: " & file.Name
+    If LCase(fso.GetExtensionName(file.Name)) = "xlsx" Then 
         Set workbook = excel.Workbooks.Open(file.Path)
         Set worksheet = workbook.Sheets(1)
 
@@ -30,7 +30,7 @@ For Each file In folder.Files
         ' First pass to find Programme Code and Level
         For row = 1 To maxRows
             For col = 1 To maxCols
-                cellValue = Trim(CStr(worksheet.Cells(row, col).Value)) 
+                cellValue = Trim(CStr(worksheet.Cells(row, col).Value))
 
                 ' Find Programme Code (LB/L/F or similar)
                 If col = 2 And row >= 4 And row <= 6 Then
@@ -38,11 +38,11 @@ For Each file In folder.Files
                         ' Convert something like "LB/L/F" to "LBL.F"
                         parts = Split(cellValue, "/")
                         If UBound(parts) >= 2 Then
-                            programmeCode = Replace(parts(0), " ", "") & parts(1) & "." & parts(2) 
+                            programmeCode = Replace(parts(0), " ", "") & parts(1) & "." & parts(2)
                         End If
                     End If
                 End If
-                
+
                 ' Term/Year (e.g., 202210 → 21-22)
                 If col = 2 And row = 3 Then
                     termCode = Trim(cellValue)
@@ -51,7 +51,7 @@ For Each file In folder.Files
                         yearEnd = Mid(termCode, 3, 2)
                         ' Calculate previous year (e.g., "21" from "22")
                         yearStart = Right("0" & CStr(CInt(yearEnd) - 1), 2)  ' Ensure 2 digits with leading zero
-                        termYear = yearStart & "-" & yearEnd 
+                        termYear = yearStart & "-" & yearEnd
                     End If
                 End If
 
@@ -71,7 +71,7 @@ For Each file In folder.Files
             newName = "ProgrammeReport-" & programmeCode & "-" & termYear & "-" & levelYear & ".xlsx"
             newPath = fso.BuildPath(folder.Path, newName)
             workbook.Close False
-            
+
             ' Check if target file already exists before renaming
             If fso.FileExists(newPath) Then
                 ' WScript.Echo "Warning: Target file already exists: " & newName
