@@ -16,8 +16,8 @@ Set folder = fso.GetFolder(scriptFolderPath)
 ' Define the root folder for CSV output (parent of the script's folder)
 Dim grandParentFolderPath
 grandParentFolderPath = fso.GetParentFolderName(scriptFolderPath)
-csvRootFolder = fso.BuildPath(grandParentFolderPath, "Data")
-WScript.Echo "Started processing folder: " & folder.Path
+csvRootFolder = fso.BuildPath(grandParentFolderPath, "csvData")
+WScript.Echo "ProcessExcelToCSV.vbs started."
 
 ' Create csvData folder if it doesn't exist
 If Not fso.FolderExists(csvRootFolder) Then
@@ -57,6 +57,8 @@ End Function
 
 ' Function to process files in a folder and its subfolders
 Sub ProcessFolder(currentFolder)
+    WScript.Echo "Starting to process folder: " & currentFolder.path
+
     For Each file In fso.GetFolder(currentFolder).Files
         ' Skip temporary files that start with "~$"
         If Left(file.Name, 2) = "~$" Then
@@ -206,7 +208,7 @@ Sub ProcessExcelFile(file)
     On Error GoTo 0
     
     fileProcessed = True
-    WScript.Echo "Starting to process file: " & file.Name
+    ' WScript.Echo "Starting to process file: " & file.Name
     
     ' Get workbook name without extension
     workbookName = Left(xlBook.Name, InStrRev(xlBook.Name, ".") - 1)
@@ -234,11 +236,11 @@ Sub ProcessExcelFile(file)
         
         ' Check if worksheet contains "Report could not be retrieved"
         If ContainsReportNotRetrieved(ws) Then
-            WScript.Echo "Worksheet contains 'Report could not be retrieved'. Skipping: " & ws.Name
+            ' WScript.Echo "Worksheet contains 'Report could not be retrieved'. Skipping: " & ws.Name
             wsIndex = wsIndex + 1
             On Error GoTo 0
             ' Skip to the next worksheet
-            WScript.Echo "Skipping worksheet: " & ws.Name
+            ' WScript.Echo "Skipping worksheet: " & ws.Name
         Else
             ' Determine if this is the first tab for special handling
             Dim isFirstTab
@@ -255,7 +257,7 @@ Sub ProcessExcelFile(file)
             
             ' Check if CSV file already exists
             If fso.FileExists(fileName) Then
-                WScript.Echo "CSV file already exists for worksheet: " & ws.Name & ". Skipping..."
+                ' WScript.Echo "CSV file already exists for worksheet: " & ws.Name & ". Skipping..."
                 ' Skip this worksheet and continue with the next one
             Else
                 ' WScript.Echo "Processing worksheet: " & ws.Name
