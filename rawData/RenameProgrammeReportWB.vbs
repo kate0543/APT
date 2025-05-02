@@ -74,8 +74,8 @@ For Each file In folder.Files
             
             ' Check if target file already exists before renaming
             If fso.FileExists(newPath) Then
-                WScript.Echo "Warning: Target file already exists: " & newName
-                WScript.Echo "Skipping rename operation for: " & file.Name
+                ' WScript.Echo "Warning: Target file already exists: " & newName
+                ' WScript.Echo "Skipping rename operation for: " & file.Name
             Else
                 fso.MoveFile file.Path, newPath
                 WScript.Echo "Renamed to: " & newName
@@ -91,4 +91,5 @@ Next
 excel.Quit
 Set excel = Nothing
 Set fso = Nothing
-WScript.Echo "Rename ProgrammeReportWB.vbs completed."
+
+MsgBox "All ProgrammeReport workbook has been renamed with programme code, term year and level year."
