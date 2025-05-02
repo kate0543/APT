@@ -31,15 +31,15 @@ xlApp.Visible = False
 ' Function to create full directory path (fixed function to handle nested folders)
 Function CreateDirectoryPath(path)
     Dim arrFolders, fullPath, i
-    
+
     ' Split the path into parts
     arrFolders = Split(path, "\")
     fullPath = arrFolders(0)
-    
+
     ' Create each level of the path
     For i = 1 To UBound(arrFolders)
         fullPath = fullPath & "\" & arrFolders(i)
-        
+
         If Not fso.FolderExists(fullPath) Then
             On Error Resume Next
             fso.CreateFolder(fullPath)
@@ -58,6 +58,7 @@ End Function
 ' Function to process files in a folder and its subfolders
 Sub ProcessFolder(currentFolder)
     WScript.Echo "Starting to process folder: " & currentFolder.path
+    WScript.Echo "Total files found in folder: " & folder.Files.Count
 
     For Each file In fso.GetFolder(currentFolder).Files
         ' Skip temporary files that start with "~$"
@@ -67,7 +68,7 @@ Sub ProcessFolder(currentFolder)
             ProcessExcelFile file
         End If
     Next
-    
+
     ' Process subfolders recursively
     For Each subfolder In fso.GetFolder(currentFolder).SubFolders
         ProcessFolder subfolder
