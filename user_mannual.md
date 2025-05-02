@@ -1,5 +1,6 @@
 ## Folder Structure
-
+<!-- Write script to auto create file folder structure for all downloaded data -->
+<!-- Qlikview Need Mannually rename -->
 ```plaintext
 rawData/                # (You can customize this folder name)
 ├── EBR/                # Save EBR system reports here
@@ -53,8 +54,12 @@ rawData/                # (You can customize this folder name)
 
 ### 3. Prepare Scripts
 
-- Copy `ProcessExcelToCSV.vbs` and `RenameProgrammeReportWB.vbs` into the main folder (`rawData`).
-- Run the scripts via command line (`cscript script_name.vbs`) or by double-clicking the `.vbs` files.
+- Copy `RenameProgrammeReportWB.vbs` into data EBR report folder ('rawData-EBR')
+-Double click to run the script
+- Copy `ProcessExcelToCSV.vbs`  into the main folder (`rawData`).
+-Double click to run the script
+
+- Alternatively Run the scripts via command line (`cscript script_name.vbs`)  
 
 ### 4. Generate Priority Group
 
@@ -70,3 +75,13 @@ rawData/                # (You can customize this folder name)
     - Click **Generate** to create the priority list.
     - Click **Reset** to change dataset, programme code, or priority reasons.
     - Alternatively, click **Export CSV** to save the exact priority list file.
+
+### 5. Note To Update Data
+
+When getting new data, you need to remove both the old raw data and the corresponding converted clean data.
+
+For example, for the Source Document Data:
+- Need to regularly check for DDL updates.
+- Remove the existing raw data file: `rawData/ProgrammeCode/Source/SBS Source 24-25.xlsx`
+- Remove the existing converted CSV data: `csvData/ProgrammeCode/Source/SBS Source 24-25_All Assessments Main Campus.csv` (Assuming `csvData` is the output folder)
+- Re-run `ProcessExcelToCSV.vbs`.
