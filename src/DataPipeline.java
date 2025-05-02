@@ -419,7 +419,7 @@ public class DataPipeline {
         if (!logDir.exists()) {
             logDir.mkdirs();
         }
-        String fileName = "priority_student_list_" + priorityType + ".csv";
+        String fileName = "Priority_student_list_" + priorityType + ".csv";
         File logFile = new File(logDir, fileName); 
         boolean writeHeader = !logFile.exists() || logFile.length() == 0;
         try (PrintWriter logWriter = new PrintWriter(new FileWriter(logFile, true))) { // always append
