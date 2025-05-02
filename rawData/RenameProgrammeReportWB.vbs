@@ -9,13 +9,14 @@ Set excel = CreateObject("Excel.Application")
 excel.Visible = False
 excel.DisplayAlerts = False
 
-Set folder = fso.GetFolder(fso.BuildPath(fso.GetParentFolderName(WScript.ScriptFullName), "SBMT/EBR"))
+Set folder = fso.GetFolder(fso.BuildPath(fso.GetParentFolderName(WScript.ScriptFullName), "EBR"))
+WScript.Echo "Rename ProgrammeReportWB.vbs started."
 
 WScript.Echo "Processing folder: " & folder.Path
 
 For Each file In folder.Files
     If LCase(fso.GetExtensionName(file.Name)) = "xlsx" Then
-        WScript.Echo "Checking file: " & file.Name
+        ' WScript.Echo "Checking file: " & file.Name
         Set workbook = excel.Workbooks.Open(file.Path)
         Set worksheet = workbook.Sheets(1)
 
@@ -29,10 +30,7 @@ For Each file In folder.Files
         ' First pass to find Programme Code and Level
         For row = 1 To maxRows
             For col = 1 To maxCols
-                cellValue = Trim(CStr(worksheet.Cells(row, col).Value))
-                If cellValue <> "" Then 
-                    WScript.Echo "Row " & row & ", Col " & col & ": " & cellValue
-                End If
+                cellValue = Trim(CStr(worksheet.Cells(row, col).Value)) 
 
                 ' Find Programme Code (LB/L/F or similar)
                 If col = 2 And row >= 4 And row <= 6 Then
@@ -40,8 +38,7 @@ For Each file In folder.Files
                         ' Convert something like "LB/L/F" to "LBL.F"
                         parts = Split(cellValue, "/")
                         If UBound(parts) >= 2 Then
-                            programmeCode = Replace(parts(0), " ", "") & parts(1) & "." & parts(2)
-                            WScript.Echo "Found programmeCode: " & programmeCode
+                            programmeCode = Replace(parts(0), " ", "") & parts(1) & "." & parts(2) 
                         End If
                     End If
                 End If
@@ -54,8 +51,7 @@ For Each file In folder.Files
                         yearEnd = Mid(termCode, 3, 2)
                         ' Calculate previous year (e.g., "21" from "22")
                         yearStart = Right("0" & CStr(CInt(yearEnd) - 1), 2)  ' Ensure 2 digits with leading zero
-                        termYear = yearStart & "-" & yearEnd
-                        WScript.Echo "Parsed termYear: " & termCode & " -> " & termYear
+                        termYear = yearStart & "-" & yearEnd 
                     End If
                 End If
 
@@ -64,7 +60,7 @@ For Each file In folder.Files
                     level = Trim(cellValue)
                     If IsNumeric(level) Then
                         levelYear = "L" & level
-                        WScript.Echo "Parsed levelYear: " & levelYear
+                        ' WScript.Echo "Parsed levelYear: " & levelYear
                     End If
                 End If
             Next
@@ -95,3 +91,4 @@ Next
 excel.Quit
 Set excel = Nothing
 Set fso = Nothing
+WScript.Echo "Rename ProgrammeReportWB.vbs completed."
