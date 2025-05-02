@@ -6,12 +6,18 @@ Dim csvRootFolder, relativePath
 ' Create FileSystemObject to handle folder and files
 Set fso = CreateObject("Scripting.FileSystemObject")
 
-' Get the folder where the script is located
-folder = fso.GetParentFolderName(WScript.ScriptFullName)
+' Get the path of the folder where the script is located
+Dim scriptFolderPath
+scriptFolderPath = fso.GetParentFolderName(WScript.ScriptFullName)
 
-' Define the root folder for CSV output
-parentFolder = fso.GetParentFolderName(folder)
-csvRootFolder = fso.BuildPath(parentFolder, "Data")
+' Get the Folder object for the script's location
+Set folder = fso.GetFolder(scriptFolderPath)
+
+' Define the root folder for CSV output (parent of the script's folder)
+Dim grandParentFolderPath
+grandParentFolderPath = fso.GetParentFolderName(scriptFolderPath)
+csvRootFolder = fso.BuildPath(grandParentFolderPath, "Data")
+WScript.Echo "Started processing folder: " & folder.Path
 
 ' Create csvData folder if it doesn't exist
 If Not fso.FolderExists(csvRootFolder) Then
@@ -38,7 +44,7 @@ Function CreateDirectoryPath(path)
             On Error Resume Next
             fso.CreateFolder(fullPath)
             If Err.Number <> 0 Then
-                WScript.Echo "Error creating folder: " & fullPath & ". Error: " & Err.Description
+                ' WScript.Echo "Error creating folder: " & fullPath & ". Error: " & Err.Description
                 Err.Clear
                 CreateDirectoryPath = False
                 Exit Function
@@ -54,7 +60,7 @@ Sub ProcessFolder(currentFolder)
     For Each file In fso.GetFolder(currentFolder).Files
         ' Skip temporary files that start with "~$"
         If Left(file.Name, 2) = "~$" Then
-            WScript.Echo "Skipping temporary file: " & file.Name
+            ' WScript.Echo "Skipping temporary file: " & file.Name
         ElseIf LCase(fso.GetExtensionName(file.Name)) = "xlsx" Then
             ProcessExcelFile file
         End If
@@ -192,7 +198,7 @@ Sub ProcessExcelFile(file)
     Set xlBook = xlApp.Workbooks.Open(file.Path, , True) ' The third parameter (True) opens the file in read-only mode
     
     If Err.Number <> 0 Then
-        WScript.Echo "Error opening file: " & file.Name & ". Skipping..."
+        ' WScript.Echo "Error opening file: " & file.Name & ". Skipping..."
         Err.Clear
         On Error GoTo 0
         Exit Sub ' Exit the sub if there's an error opening the file
@@ -214,7 +220,7 @@ Sub ProcessExcelFile(file)
         
         ' Use the fixed function to create the full directory path
         If Not CreateDirectoryPath(saveFolderPath) Then
-            WScript.Echo "Failed to create directory structure. Using root csvData folder instead."
+            ' WScript.Echo "Failed to create directory structure. Using root csvData folder instead."
             saveFolderPath = csvRootFolder
         End If
     Else
@@ -252,17 +258,17 @@ Sub ProcessExcelFile(file)
                 WScript.Echo "CSV file already exists for worksheet: " & ws.Name & ". Skipping..."
                 ' Skip this worksheet and continue with the next one
             Else
-                WScript.Echo "Processing worksheet: " & ws.Name
+                ' WScript.Echo "Processing worksheet: " & ws.Name
                 
                 ' Create a TextStream object for writing
                 Set textStream = fso.CreateTextFile(fileName, True)
                 
                 If Err.Number <> 0 Then
-                    WScript.Echo "Error creating CSV file for worksheet: " & ws.Name & ". Error: " & Err.Description
+                    ' WScript.Echo "Error creating CSV file for worksheet: " & ws.Name & ". Error: " & Err.Description
                     Err.Clear
                     ' Skip to next worksheet
                     On Error GoTo 0
-                    WScript.Echo "Skipping worksheet: " & ws.Name
+                    ' WScript.Echo "Skipping worksheet: " & ws.Name
                 Else
                     ' Find the last used row and column in the worksheet
                     lastRow = 1
@@ -305,12 +311,12 @@ Sub ProcessExcelFile(file)
                     On Error Resume Next
                     textStream.Close
                     If Err.Number <> 0 Then
-                        WScript.Echo "Error closing CSV file. Error: " & Err.Description
+                        ' WScript.Echo "Error closing CSV file. Error: " & Err.Description
                         Err.Clear
                     End If
                     On Error GoTo 0
                     
-                    WScript.Echo "Finished processing worksheet: " & ws.Name
+                    ' WScript.Echo "Finished processing worksheet: " & ws.Name
                 End If
             End If
             wsIndex = wsIndex + 1
@@ -322,13 +328,13 @@ Sub ProcessExcelFile(file)
     On Error Resume Next
     xlBook.Close False
     If Err.Number <> 0 Then
-        WScript.Echo "Error closing workbook. Error: " & Err.Description
+        ' WScript.Echo "Error closing workbook. Error: " & Err.Description
         Err.Clear
     End If
     On Error GoTo 0
     
     ' Print a message indicating the file has been processed
-    WScript.Echo "Processed file: " & file.Name
+    ' WScript.Echo "Processed file: " & file.Name
 End Sub
 
 ' Start processing from the main folder
@@ -338,7 +344,7 @@ ProcessFolder folder
 ' Quit Excel
 xlApp.Quit
 If Err.Number <> 0 Then
-    WScript.Echo "Error quitting Excel. Error: " & Err.Description
+    ' WScript.Echo "Error quitting Excel. Error: " & Err.Description
     Err.Clear
 End If
 
