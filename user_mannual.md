@@ -55,10 +55,11 @@ rawData/                # (You can customize this folder name)
 ### 3. Prepare Scripts
 
 - Copy `RenameProgrammeReportWB.vbs` into data ProgrammeCode folder ('rawData-ProgrammeCode')
--Double click to run the script
+- Note: for each programe, you need to make sure copy this script to each programme folder
+- Double click to run the script
 - Copy `ProcessExcelToCSV.vbs`  into the main folder (`rawData`).
--Double click to run the script
-
+- Note: you must follow the sequece of these steps when run scripts
+- Double click to run the script
 - Alternatively Run the scripts via command line (`cscript script_name.vbs`)  
 
 ### 4. Generate Priority Group
