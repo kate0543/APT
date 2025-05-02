@@ -13,6 +13,7 @@ Set folder = fso.GetFolder(fso.BuildPath(fso.GetParentFolderName(WScript.ScriptF
 WScript.Echo "Rename ProgrammeReportWB.vbs started."
 
 WScript.Echo "Processing folder: " & folder.Path
+WScript.Echo "Total files found in folder: " & folder.Files.Count
 
 For Each file In folder.Files
     If LCase(fso.GetExtensionName(file.Name)) = "xlsx" Then
@@ -91,5 +92,6 @@ Next
 excel.Quit
 Set excel = Nothing
 Set fso = Nothing
+
 
 MsgBox "All ProgrammeReport workbook has been renamed with programme code, term year and level year."
