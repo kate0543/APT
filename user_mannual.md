@@ -54,7 +54,7 @@ rawData/                # (You can customize this folder name)
 
 ### 3. Prepare Scripts
 
-- Copy `RenameProgrammeReportWB.vbs` into data EBR report folder ('rawData-EBR')
+- Copy `RenameProgrammeReportWB.vbs` into data ProgrammeCode folder ('rawData-ProgrammeCode')
 -Double click to run the script
 - Copy `ProcessExcelToCSV.vbs`  into the main folder (`rawData`).
 -Double click to run the script
