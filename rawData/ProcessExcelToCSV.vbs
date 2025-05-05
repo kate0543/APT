@@ -58,7 +58,7 @@ End Function
 ' Function to process files in a folder and its subfolders
 Sub ProcessFolder(currentFolder)
     WScript.Echo "Starting to process folder: " & currentFolder.path
-    WScript.Echo "Total files found in folder: " & folder.Files.Count
+    ' WScript.Echo "Total files found in folder: " & folder.Files.Count
 
     For Each file In fso.GetFolder(currentFolder).Files
         ' Skip temporary files that start with "~$"
@@ -123,7 +123,7 @@ Function IsProgrammeReport(fileName)
 End Function
 ' Function to check if the file name contains "Source"
 Function isSourceDocument(fileName)
-    If InStr(1, fileName, "Source", vbTextCompare) > 0 Then
+    If LCase(Left(fileName, 15)) = "source" Then
         isSourceDocument = True
     Else
         isSourceDocument = False
