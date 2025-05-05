@@ -67,7 +67,7 @@ rawData/                # (You can customize this folder name)
 1. Run the `APP_DEMO` app.
     - If not installed, double-click `APP_DEMO_Installer.exe`.
 2. When the UI loads:
-    - Choose the root folder (the new folder you created; by default, look for the `Data` folder in the parent directory).
+    - Choose the root folder (the new folder you created; by default, look for the `csvData` folder in the parent directory).
     - Choose the target folder to save the generated priority list and app runtime log files.
     - Select the Programme Code from the dropdown menu.
     - Select the Priority Reason from the dropdown menu.
