@@ -79,12 +79,12 @@ For Each file In folder.Files
                 ' WScript.Echo "Skipping rename operation for: " & file.Name
             Else
                 fso.MoveFile file.Path, newPath
-                WScript.Echo "Renamed to: " & newName
+                ' WScript.Echo "Renamed to: " & newName
             End If
         Else
             workbook.Close False
-            WScript.Echo "Skipped (missing data): " & file.Name & _
-                " (programmeCode: " & programmeCode & ", termYear: " & termYear & ", levelYear: " & levelYear & ")"
+            ' WScript.Echo "Skipped (missing data): " & file.Name & _
+            '     " (programmeCode: " & programmeCode & ", termYear: " & termYear & ", levelYear: " & levelYear & ")"
         End If
     End If
 Next
