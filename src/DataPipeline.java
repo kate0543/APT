@@ -17,8 +17,8 @@ public class DataPipeline {
     public static String logFolderPath = "";
 
     public static void main(String[] args) {
-          baseFolderPath = "data/SBMT/";
-        String targetProgrammeCode = "SBMT"; // Target programme codes
+          baseFolderPath = "data/LBL/";
+        String targetProgrammeCode = "LBL"; // Target programme codes
          logFolderPath = getLogFolderPath(targetProgrammeCode); // Get log folder path
         // Prepare log file
     File logDir = new File(logFolderPath);
