@@ -46,7 +46,7 @@ public class StEP {
         List<File> matchingFiles = new ArrayList<>();
         try {
             // Get all files matching the pattern
-            matchingFiles = locateEBRFiles(baseFolderPath + "StEP/", "BMT");
+            matchingFiles = locateEBRFiles(baseFolderPath + "StEP/", targetProgrammeCode);
 
             if (matchingFiles.isEmpty()) {
                 System.out.println("No matching files found in " + baseFolderPath + "StEP/");
@@ -171,7 +171,7 @@ public class StEP {
                             student.incrementTotalSessionCountLastTerm();
 
                             // Check if the event was 'NotAttended' and increment the count
-                            if ("NotAttended".equalsIgnoreCase(eventAttended)) {
+                            if (eventAttended.toLowerCase().contains("not") && eventAttended.toLowerCase().contains("attended")) {
                                 student.incrementNotAttendedSessionCountLastTerm();
                             }
                         } else {
