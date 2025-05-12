@@ -8,4 +8,5 @@ bin
 .idea
 out
 dist
-APT_DEMO/APT.jar
+APT_Demo/*.jar
+APT_Demo/*.exe
