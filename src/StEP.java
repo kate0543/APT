@@ -11,7 +11,7 @@ public class StEP {
     public static void main(String[] args) throws IOException {
         String baseFolderPath = "data/SBMT/";
  
-        String targetProgrammeCode = "SBMT";// Replace with the actual target programme codes
+        String targetProgrammeCode = "LBL";// Replace with the actual target programme codes
         String logFolderPath = DataPipeline.getLogFolderPath(targetProgrammeCode);
 
         List<Student> students = new ArrayList<>();
